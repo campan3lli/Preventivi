@@ -1,0 +1,76 @@
+{
+  "summary": "Tested 3 new features: 1) Duplicate quote 2) Edit quote 3) Templates. All features working correctly. Backend tests 100% pass. Frontend tests pass with one known issue: quotes with deleted clients cannot be edited/downloaded (expected behavior - backend validates client exists).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "Backend: GET /api/templates returns 6 predefined templates",
+    "Backend: Templates have correct quote types (standard, moduli, step, ibrido)",
+    "Backend: POST /api/quotes/{id}/duplicate creates new quote with new number and draft status",
+    "Backend: Duplicate preserves all quote content (services, steps, premise, etc.)",
+    "Backend: PUT /api/quotes/{id} updates quote subject and services",
+    "Backend: POST /api/templates/from-quote/{id} saves quote as template",
+    "Backend: PDF generation works for all quote types",
+    "Frontend: Templates page loads with 6 predefined templates",
+    "Frontend: Quotes list shows Edit (pencil) and Copy (duplicate) icons for each quote",
+    "Frontend: Duplicate button in quotes list creates new quote with toast 'Preventivo #N duplicato!'",
+    "Frontend: Duplicated quote has draft status (Bozza)",
+    "Frontend: Edit button navigates to /preventivi/:id/modifica",
+    "Frontend: Edit page shows 'Modifica Preventivo' title",
+    "Frontend: Edit page pre-fills client, subject, services from existing quote",
+    "Frontend: Save button shows 'Aggiorna Preventivo' in edit mode",
+    "Frontend: Quote update shows toast 'Preventivo aggiornato!'",
+    "Frontend: Quote detail page shows Modifica, Duplica, Salva come Template buttons",
+    "Frontend: Template selection available in step 1 of new quote wizard",
+    "Frontend: Loading template shows toast 'Template X caricato'",
+    "Frontend: Save as Template prompts for name and saves successfully"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/pytest_results_new_features.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Edit flow fails gracefully when client_id references deleted client (returns 404) - this is correct behavior but could show better error message to user"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_new_features.py"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "100%"
+  },
+  "test_credentials": {
+    "test_client": "Test Company Frontend (frontend@testcompany.it)",
+    "note": "Previous test clients (TEST_UI_Client_StepQuote) were deleted by cleanup - quotes referencing them will fail edit/PDF"
+  },
+  "seed_data_creation": "6 predefined templates seeded via /api/seed endpoint",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "3 new features fully tested and working: 1) Duplicate quote via POST /api/quotes/{id}/duplicate - creates new quote with incremented number and draft status. 2) Edit quote via PUT /api/quotes/{id} - frontend uses /preventivi/:id/modifica route, reuses NewQuotePage component with isEditing flag. 3) Templates - 6 predefined templates seeded, can load template when creating new quote, can save quote as template from detail page. Note: Some test quotes (2-5) reference deleted test client and will fail edit/PDF operations - this is expected behavior as backend validates client exists.",
+  "features_tested": {
+    "duplicate_quote": {
+      "endpoint": "POST /api/quotes/{id}/duplicate",
+      "ui_location": "Quotes list (Copy icon) and Quote detail page (Duplica button)",
+      "behavior": "Creates new quote with new ID, incremented quote_number, draft status, preserves all content"
+    },
+    "edit_quote": {
+      "endpoint": "PUT /api/quotes/{id}",
+      "ui_location": "Quotes list (Edit icon) and Quote detail page (Modifica button)",
+      "route": "/preventivi/:id/modifica",
+      "behavior": "Loads existing quote data, allows modification, saves changes"
+    },
+    "templates": {
+      "endpoints": ["GET /api/templates", "POST /api/templates", "POST /api/templates/from-quote/{id}"],
+      "ui_location": "Templates page (/template), New quote wizard step 1, Quote detail page (Salva come Template)",
+      "predefined_templates": 6,
+      "types": ["Pacchetto Sito Web (standard)", "Pacchetto Social Media (moduli)", "Pacchetto E-Commerce (standard)", "Pacchetto Brand Identity (step)", "Pacchetto Google Ads (standard)", "Pacchetto Lancio Attività (ibrido)"]
+    }
+  }
+}

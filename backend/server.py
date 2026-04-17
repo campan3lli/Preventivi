@@ -393,6 +393,92 @@ async def delete_quote(quote_id: str):
         raise HTTPException(status_code=404, detail="Quote not found")
     return {"message": "Quote deleted"}
 
+@api_router.post("/quotes/{quote_id}/duplicate", response_model=Quote)
+async def duplicate_quote(quote_id: str):
+    original = await db.quotes.find_one({"id": quote_id}, {"_id": 0})
+    if not original:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    
+    new_number = await get_next_quote_number()
+    new_id = str(uuid.uuid4())
+    
+    new_quote = {**original}
+    new_quote['id'] = new_id
+    new_quote['quote_number'] = new_number
+    new_quote['status'] = 'draft'
+    new_quote['created_at'] = datetime.now(timezone.utc).isoformat()
+    
+    await db.quotes.insert_one(new_quote)
+    new_quote.pop('_id', None)
+    if isinstance(new_quote.get('created_at'), str):
+        new_quote['created_at'] = datetime.fromisoformat(new_quote['created_at'])
+    return new_quote
+
+# ==================== TEMPLATES API ====================
+
+class Template(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: Optional[str] = None
+    quote_type: str = "standard"
+    services: List[QuoteService] = []
+    steps: List[QuoteStep] = []
+    premise: Optional[str] = None
+    methodology: Optional[str] = None
+    payment_terms: str = "30% all'accettazione, 70% alla consegna"
+    delivery_time: Optional[str] = None
+
+class TemplateCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    quote_type: str = "standard"
+    services: List[QuoteService] = []
+    steps: List[QuoteStep] = []
+    premise: Optional[str] = None
+    methodology: Optional[str] = None
+    payment_terms: str = "30% all'accettazione, 70% alla consegna"
+    delivery_time: Optional[str] = None
+
+@api_router.get("/templates", response_model=List[Template])
+async def get_templates():
+    templates = await db.templates.find({}, {"_id": 0}).to_list(100)
+    return templates
+
+@api_router.post("/templates", response_model=Template)
+async def create_template(template: TemplateCreate):
+    template_obj = Template(**template.model_dump())
+    doc = template_obj.model_dump()
+    await db.templates.insert_one(doc)
+    return template_obj
+
+@api_router.delete("/templates/{template_id}")
+async def delete_template(template_id: str):
+    result = await db.templates.delete_one({"id": template_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"message": "Template deleted"}
+
+@api_router.post("/templates/from-quote/{quote_id}", response_model=Template)
+async def create_template_from_quote(quote_id: str, name: str, description: str = ""):
+    quote = await db.quotes.find_one({"id": quote_id}, {"_id": 0})
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    
+    template_obj = Template(
+        name=name,
+        description=description,
+        quote_type=quote.get('quote_type', 'standard'),
+        services=quote.get('services', []),
+        steps=quote.get('steps', []),
+        premise=quote.get('premise', ''),
+        methodology=quote.get('methodology', ''),
+        payment_terms=quote.get('payment_terms', ''),
+        delivery_time=quote.get('delivery_time', '')
+    )
+    doc = template_obj.model_dump()
+    await db.templates.insert_one(doc)
+    return template_obj
+
 # ==================== PDF GENERATION ====================
 
 def format_price(price: float, price_type: str) -> str:
@@ -788,7 +874,103 @@ async def seed_data():
     ]
     await db.services.insert_many(services_data)
     
-    return {"message": "Data seeded successfully", "services_count": len(services_data), "suppliers_count": len(suppliers_data)}
+    # Seed predefined templates
+    # We need service IDs to reference them in templates. Use the ones we just created
+    svc_map = {}
+    for s in services_data:
+        svc_map[s['name']] = s
+
+    def make_svc(name):
+        s = svc_map.get(name, {})
+        return {"service_id": s.get("id", ""), "service_name": s.get("name", name), "description": s.get("description", ""), "sub_items": s.get("sub_items", []), "price": s.get("price", 0), "price_type": s.get("price_type", "una_tantum"), "quantity": 1, "is_selected": True}
+
+    templates_data = [
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Pacchetto Sito Web",
+            "description": "Template per preventivi di realizzazione sito web con manutenzione",
+            "quote_type": "standard",
+            "services": [make_svc("Realizzazione sito web customizzato"), make_svc("Manutenzione e aggiornamento annuale"), make_svc("SEO di base"), make_svc("Local SEO Google Business Profile")],
+            "steps": [],
+            "premise": "La presente proposta riguarda la progettazione e lo sviluppo di un sito web professionale, pensato per comunicare in modo chiaro e coinvolgente i valori e i servizi della vostra attività.",
+            "methodology": "Il nostro approccio si basa sulla creazione di un ecosistema digitale moderno e funzionale, ottimizzato per la visibilità sui motori di ricerca e per un'esperienza utente efficace su tutti i dispositivi.",
+            "payment_terms": "30% all'accettazione, 70% alla consegna",
+            "delivery_time": "4-6 settimane"
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Pacchetto Social Media",
+            "description": "Template per gestione social media con contenuti e ADV",
+            "quote_type": "moduli",
+            "services": [make_svc("Configurazione iniziale account social"), make_svc("Social media management Pro"), make_svc("Creazione contenuti foto e video"), make_svc("ADV Awareness Meta (Facebook + Instagram)"), make_svc("Affiancamento marketing")],
+            "steps": [],
+            "premise": "La presente proposta ha l'obiettivo di costruire una presenza digitale solida e riconoscibile, attraverso una gestione professionale dei canali social e la creazione di contenuti di qualità.",
+            "methodology": "Adottiamo un approccio strategico e data-driven, combinando creatività e analisi per massimizzare l'engagement e la crescita della community online.",
+            "payment_terms": "Fatturazione mensile",
+            "delivery_time": "Avvio entro 1 settimana dalla conferma"
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Pacchetto E-Commerce",
+            "description": "Template per realizzazione e-commerce completo",
+            "quote_type": "standard",
+            "services": [make_svc("Realizzazione eCommerce + WooCommerce"), make_svc("Manutenzione e aggiornamento annuale"), make_svc("SEO di base"), make_svc("Email marketing"), make_svc("Gestione campagne Google Ads Search")],
+            "steps": [],
+            "premise": "La presente proposta riguarda la realizzazione di un e-commerce professionale, progettato per offrire un'esperienza di acquisto intuitiva e sicura ai vostri clienti.",
+            "methodology": "Sviluppiamo soluzioni e-commerce personalizzate con WooCommerce, integrando strategie di marketing digitale per massimizzare le vendite online.",
+            "payment_terms": "30% all'accettazione, 40% a metà lavoro, 30% alla consegna",
+            "delivery_time": "6-8 settimane"
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Pacchetto Brand Identity",
+            "description": "Template per percorso di branding completo a step",
+            "quote_type": "step",
+            "services": [],
+            "steps": [
+                {"step_number": 1, "title": "Onboarding e set-up", "description": "Raccolta informazioni strutturate su storia del brand, obiettivi, percezione attuale e direzione desiderata.", "duration": "3 giorni", "output": "Brief approvato, calendario scadenze, lista asset necessari", "services": [make_svc("Analisi e strategia")]},
+                {"step_number": 2, "title": "Analisi e insight", "description": "Analisi competitor, definizione posizionamento, analisi target e touchpoint audit.", "duration": "5 giorni", "output": "Documento con opportunità, rischi e direzioni consigliate", "services": [make_svc("Analisi e strategia")]},
+                {"step_number": 3, "title": "Brand Strategy", "description": "Definizione purpose, promessa, valori, personalità, tone of voice e value proposition.", "duration": "10 giorni", "output": "Brand Strategy Deck", "services": [make_svc("Allineamento brand identity pro")]},
+                {"step_number": 4, "title": "Brand Identity", "description": "Proposte logo, direzione creativa completa: logo system, palette colori, tipografia, pattern.", "duration": "12 giorni", "output": "Brand Identity approvata", "services": [make_svc("Progettazione grafica")]},
+                {"step_number": 5, "title": "Brand Kit e lancio", "description": "Creazione brand guidelines, template base e handover strutturato.", "duration": "5 giorni", "output": "Brand Kit completo, Kit di lancio", "services": [make_svc("Revisione brand e identità visiva")]}
+            ],
+            "premise": "Il percorso proposto mira a costruire un'identità di brand solida, coerente e riconoscibile, partendo da un'analisi approfondita fino alla creazione di tutti gli strumenti necessari per comunicare efficacemente.",
+            "methodology": "Adottiamo un approccio strategico e progressivo: ogni fase si basa sui risultati della precedente, garantendo coerenza e qualità in ogni passaggio del processo creativo.",
+            "payment_terms": "30% all'accettazione, 30% a metà percorso, 40% alla consegna",
+            "delivery_time": "35 giorni lavorativi"
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Pacchetto Google Ads",
+            "description": "Template per gestione campagne Google Ads",
+            "quote_type": "standard",
+            "services": [make_svc("Setup ecosistema Google Ads + Analytics"), make_svc("Gestione campagne Google Ads Search"), make_svc("Gestione campagne Google Ads Performance Max")],
+            "steps": [],
+            "premise": "La presente proposta riguarda la configurazione e gestione professionale di campagne pubblicitarie su Google Ads, con l'obiettivo di aumentare la visibilità online e generare contatti qualificati.",
+            "methodology": "Il nostro approccio si basa su un'analisi approfondita delle keyword strategiche e sull'ottimizzazione continua delle campagne, supportata da dashboard di monitoraggio in tempo reale.",
+            "payment_terms": "Setup una tantum + fatturazione mensile per gestione",
+            "delivery_time": "Setup in 1 settimana, gestione continuativa"
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "name": "Pacchetto Lancio Attività",
+            "description": "Template completo per lancio nuova attività (ibrido)",
+            "quote_type": "ibrido",
+            "services": [make_svc("Configurazione iniziale account social"), make_svc("Campagna di lancio attività")],
+            "steps": [
+                {"step_number": 1, "title": "Strategia e brand", "description": "Definizione strategia comunicativa e allineamento identità visiva per il lancio.", "duration": "2 settimane", "output": "Strategia di lancio, Brand kit", "services": [make_svc("Strategia di comunicazione"), make_svc("Revisione brand e identità visiva")]},
+                {"step_number": 2, "title": "Sito web e presenza digitale", "description": "Realizzazione sito web e ottimizzazione SEO per il lancio.", "duration": "4 settimane", "output": "Sito web online, Google Business configurato", "services": [make_svc("Realizzazione sito web customizzato"), make_svc("SEO di base"), make_svc("Local SEO Google Business Profile")]},
+                {"step_number": 3, "title": "Social e ADV", "description": "Avvio gestione social e campagne pubblicitarie di lancio.", "duration": "Continuativa", "output": "Canali social attivi, Campagne ADV in corso", "services": [make_svc("Social media management Pro"), make_svc("ADV Awareness Meta (Facebook + Instagram)")]}
+            ],
+            "premise": "Questo percorso è pensato per accompagnare il lancio della vostra attività con una strategia di comunicazione integrata, dalla definizione del brand alla presenza online e alla promozione attiva.",
+            "methodology": "Un approccio a fasi progressive che garantisce una base solida prima di procedere con la promozione, massimizzando l'impatto del lancio.",
+            "payment_terms": "Piano personalizzato in base alle fasi",
+            "delivery_time": "8-10 settimane per il setup, poi gestione continuativa"
+        }
+    ]
+    await db.templates.insert_many(templates_data)
+    
+    return {"message": "Data seeded successfully", "services_count": len(services_data), "suppliers_count": len(suppliers_data), "templates_count": len(templates_data)}
 
 # ==================== ROOT ====================
 

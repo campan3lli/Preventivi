@@ -15,7 +15,8 @@ import { ScrollArea } from "./components/ui/scroll-area";
 import { 
   FileText, Users, Package, Home, Plus, Search, Edit, Trash2, 
   Download, Mail, Eye, ChevronRight, List, Layers, Grid3X3, Shuffle,
-  Building2, Phone, MapPin, Receipt, Settings, CheckCircle2
+  Building2, Phone, MapPin, Receipt, Settings, CheckCircle2, Copy,
+  BookTemplate, Bookmark
 } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -61,6 +62,10 @@ const Sidebar = () => (
       <NavLink to="/fornitori" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} data-testid="nav-suppliers">
         <Building2 size={20} />
         Fornitori
+      </NavLink>
+      <NavLink to="/template" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} data-testid="nav-templates">
+        <Bookmark size={20} />
+        Template
       </NavLink>
     </nav>
   </aside>
@@ -758,6 +763,15 @@ const QuotesPage = () => {
     } catch (err) { toast.error('Errore download PDF'); }
   };
 
+  const handleDuplicate = async (quote) => {
+    try {
+      const res = await axios.post(`${API}/quotes/${quote.id}/duplicate`);
+      toast.success(`Preventivo #${res.data.quote_number} duplicato!`);
+      const quotesRes = await axios.get(`${API}/quotes`);
+      setQuotes(quotesRes.data.reverse());
+    } catch (err) { toast.error('Errore nella duplicazione'); }
+  };
+
   const filteredQuotes = quotes.filter(q => 
     (q.client_name.toLowerCase().includes(search.toLowerCase()) || q.subject.toLowerCase().includes(search.toLowerCase())) &&
     (statusFilter === 'all' || q.status === statusFilter)
@@ -823,6 +837,12 @@ const QuotesPage = () => {
                         <Button variant="ghost" size="sm" onClick={() => navigate(`/preventivi/${quote.id}`)} data-testid={`view-quote-${quote.id}`}>
                           <Eye size={16} />
                         </Button>
+                        <Button variant="ghost" size="sm" onClick={() => navigate(`/preventivi/${quote.id}/modifica`)} data-testid={`edit-quote-${quote.id}`}>
+                          <Edit size={16} />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDuplicate(quote)} data-testid={`duplicate-quote-${quote.id}`} title="Duplica">
+                          <Copy size={16} />
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleDownload(quote)} data-testid={`download-quote-${quote.id}`}>
                           <Download size={16} />
                         </Button>
@@ -848,14 +868,18 @@ const QuotesPage = () => {
   );
 };
 
-// New Quote page
+// New/Edit Quote page
 const NewQuotePage = () => {
   const navigate = useNavigate();
+  const { id: editId } = useParams();
+  const isEditing = !!editId;
   const [step, setStep] = useState(1);
   const [clients, setClients] = useState([]);
   const [services, setServices] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const [formData, setFormData] = useState({
     client_id: '',
@@ -875,24 +899,55 @@ const NewQuotePage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [clientsRes, servicesRes, suppliersRes] = await Promise.all([
+        const [clientsRes, servicesRes, suppliersRes, templatesRes] = await Promise.all([
           axios.get(`${API}/clients`),
           axios.get(`${API}/services`),
-          axios.get(`${API}/suppliers`)
+          axios.get(`${API}/suppliers`),
+          axios.get(`${API}/templates`)
         ]);
         setClients(clientsRes.data);
         setServices(servicesRes.data.filter(s => s.is_active));
         setSuppliers(suppliersRes.data);
+        setTemplates(templatesRes.data);
         
-        // Auto-select main supplier
-        const mainSupplier = suppliersRes.data.find(s => s.is_main);
-        if (mainSupplier) {
-          setFormData(prev => ({ ...prev, supplier_ids: [mainSupplier.id] }));
+        if (isEditing) {
+          // Load existing quote data
+          const quoteRes = await axios.get(`${API}/quotes/${editId}`);
+          const q = quoteRes.data;
+          setFormData({
+            client_id: q.client_id, supplier_ids: q.supplier_ids || [],
+            subject: q.subject, quote_type: q.quote_type,
+            services: q.services || [], steps: q.steps || [],
+            premise: q.premise || '', methodology: q.methodology || '',
+            validity_days: q.validity_days || 30, payment_terms: q.payment_terms || '',
+            delivery_time: q.delivery_time || '', extra_notes: q.extra_notes || ''
+          });
+        } else {
+          // Auto-select main supplier
+          const mainSupplier = suppliersRes.data.find(s => s.is_main);
+          if (mainSupplier) {
+            setFormData(prev => ({ ...prev, supplier_ids: [mainSupplier.id] }));
+          }
         }
       } catch (err) { console.error(err); }
     };
     fetchData();
-  }, []);
+  }, [editId, isEditing]);
+
+  const loadTemplate = (template) => {
+    setFormData(prev => ({
+      ...prev,
+      quote_type: template.quote_type,
+      services: template.services || [],
+      steps: template.steps || [],
+      premise: template.premise || '',
+      methodology: template.methodology || '',
+      payment_terms: template.payment_terms || '',
+      delivery_time: template.delivery_time || ''
+    }));
+    setShowTemplates(false);
+    toast.success(`Template "${template.name}" caricato`);
+  };
 
   const quoteTypes = [
     { value: 'standard', label: 'Standard', desc: 'Lista servizi singoli', icon: List },
@@ -979,10 +1034,16 @@ const NewQuotePage = () => {
     if (!hasServices) { toast.error('Seleziona almeno un servizio'); return; }
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/quotes`, formData);
-      toast.success('Preventivo creato!');
-      navigate(`/preventivi/${res.data.id}`);
-    } catch (err) { toast.error('Errore nella creazione'); }
+      if (isEditing) {
+        await axios.put(`${API}/quotes/${editId}`, formData);
+        toast.success('Preventivo aggiornato!');
+        navigate(`/preventivi/${editId}`);
+      } else {
+        const res = await axios.post(`${API}/quotes`, formData);
+        toast.success('Preventivo creato!');
+        navigate(`/preventivi/${res.data.id}`);
+      }
+    } catch (err) { toast.error('Errore nel salvataggio'); }
     setLoading(false);
   };
 
@@ -1023,7 +1084,7 @@ const NewQuotePage = () => {
   return (
     <div className="animate-fadeIn" data-testid="new-quote-page">
       <div className="page-header">
-        <h1 className="page-title">Nuovo Preventivo</h1>
+        <h1 className="page-title">{isEditing ? 'Modifica Preventivo' : 'Nuovo Preventivo'}</h1>
         <p className="page-subtitle">Step {step} di {totalSteps}</p>
       </div>
 
@@ -1066,6 +1127,32 @@ const NewQuotePage = () => {
                 ))}
               </div>
             </div>
+
+            {!isEditing && templates.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="form-label">Carica da Template</label>
+                  <Button variant="ghost" size="sm" onClick={() => setShowTemplates(!showTemplates)} data-testid="toggle-templates-btn">
+                    {showTemplates ? 'Nascondi' : 'Mostra template'}
+                  </Button>
+                </div>
+                {showTemplates && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+                    {templates.map(t => (
+                      <div key={t.id} className="border rounded-lg p-4 hover:border-[#002fa7] cursor-pointer transition-colors"
+                        onClick={() => loadTemplate(t)} data-testid={`template-${t.id}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Bookmark size={16} className="text-[#002fa7]" />
+                          <p className="font-semibold text-sm">{t.name}</p>
+                        </div>
+                        <p className="text-xs text-gray-500">{t.description}</p>
+                        <Badge variant="outline" className="mt-2 text-xs">{t.quote_type}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex justify-end">
               <Button onClick={() => setStep(2)} className="btn-primary gap-2" data-testid="next-step-1">
                 Avanti <ChevronRight size={18} />
@@ -1271,7 +1358,7 @@ const NewQuotePage = () => {
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(2)}>Indietro</Button>
               <Button onClick={handleSubmit} className="btn-secondary gap-2" disabled={loading} data-testid="create-quote-btn">
-                {loading ? 'Creazione...' : 'Crea Preventivo'}
+                {loading ? 'Salvataggio...' : isEditing ? 'Aggiorna Preventivo' : 'Crea Preventivo'}
               </Button>
             </div>
           </CardContent>
@@ -1353,6 +1440,23 @@ const QuoteDetailPage = () => {
     } catch (err) { toast.error('Errore'); }
   };
 
+  const handleDuplicate = async () => {
+    try {
+      const res = await axios.post(`${API}/quotes/${id}/duplicate`);
+      toast.success(`Preventivo #${res.data.quote_number} duplicato!`);
+      navigate(`/preventivi/${res.data.id}`);
+    } catch (err) { toast.error('Errore nella duplicazione'); }
+  };
+
+  const handleSaveAsTemplate = async () => {
+    const name = prompt('Nome del template:');
+    if (!name) return;
+    try {
+      await axios.post(`${API}/templates/from-quote/${id}?name=${encodeURIComponent(name)}`);
+      toast.success('Template salvato!');
+    } catch (err) { toast.error('Errore nel salvataggio template'); }
+  };
+
   if (!quote) return <div className="p-8">Caricamento...</div>;
 
   return (
@@ -1383,8 +1487,14 @@ const QuoteDetailPage = () => {
           <Button variant="outline" onClick={handleDownload} className="gap-2" data-testid="download-pdf-btn">
             <Download size={18} /> Scarica PDF
           </Button>
-          <Button onClick={() => setIsEmailModalOpen(true)} className="btn-primary gap-2" data-testid="send-email-btn">
-            <Mail size={18} /> Invia Email
+          <Button variant="outline" onClick={() => navigate(`/preventivi/${id}/modifica`)} className="gap-2" data-testid="edit-quote-btn">
+            <Edit size={18} /> Modifica
+          </Button>
+          <Button variant="outline" onClick={handleDuplicate} className="gap-2" data-testid="duplicate-quote-btn">
+            <Copy size={18} /> Duplica
+          </Button>
+          <Button variant="outline" onClick={handleSaveAsTemplate} className="gap-2" data-testid="save-template-btn">
+            <Bookmark size={18} /> Salva come Template
           </Button>
         </div>
       </div>
@@ -1566,6 +1676,91 @@ const QuoteDetailPage = () => {
   );
 };
 
+// Templates page
+const TemplatesPage = () => {
+  const [templates, setTemplates] = useState([]);
+  const navigate = useNavigate();
+
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API}/templates`);
+      setTemplates(res.data);
+    } catch (err) { console.error(err); }
+  }, []);
+
+  useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Eliminare questo template?')) {
+      try {
+        await axios.delete(`${API}/templates/${id}`);
+        toast.success('Template eliminato');
+        fetchTemplates();
+      } catch (err) { toast.error('Errore'); }
+    }
+  };
+
+  const typeLabels = { standard: 'Standard', step: 'A Step', moduli: 'Moduli', ibrido: 'Ibrido' };
+
+  const countServices = (t) => {
+    let count = (t.services || []).length;
+    (t.steps || []).forEach(s => { count += (s.services || []).length; });
+    return count;
+  };
+
+  return (
+    <div className="animate-fadeIn" data-testid="templates-page">
+      <div className="page-header">
+        <h1 className="page-title">Template Predefiniti</h1>
+        <p className="page-subtitle">Usa i template per creare preventivi più velocemente</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {templates.map((template) => (
+          <Card key={template.id} className="card-hover" data-testid={`template-card-${template.id}`}>
+            <CardContent className="p-6">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-[#002fa7] text-white rounded-lg flex items-center justify-center">
+                    <Bookmark size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[#1a281f]">{template.name}</h3>
+                    <Badge variant="outline" className="text-xs mt-1">{typeLabels[template.quote_type] || template.quote_type}</Badge>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => handleDelete(template.id)} className="text-red-600">
+                  <Trash2 size={16} />
+                </Button>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">{template.description}</p>
+              <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                <span>{countServices(template)} servizi</span>
+                {template.steps?.length > 0 && <span>{template.steps.length} fasi</span>}
+              </div>
+              <Button className="w-full btn-primary gap-2" onClick={() => navigate('/preventivi/nuovo')} data-testid={`use-template-${template.id}`}>
+                <Plus size={16} /> Usa Template
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {templates.length === 0 && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="empty-state">
+              <div className="empty-state-icon"><Bookmark size={32} /></div>
+              <p className="empty-state-title">Nessun template</p>
+              <p className="empty-state-desc">I template verranno creati automaticamente. Puoi anche salvare un preventivo come template dalla sua pagina di dettaglio.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
+
 // App layout
 const AppLayout = ({ children }) => (
   <div className="App">
@@ -1591,10 +1786,12 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/preventivi" element={<QuotesPage />} />
           <Route path="/preventivi/nuovo" element={<NewQuotePage />} />
+          <Route path="/preventivi/:id/modifica" element={<NewQuotePage />} />
           <Route path="/preventivi/:id" element={<QuoteDetailPage />} />
           <Route path="/clienti" element={<ClientsPage />} />
           <Route path="/servizi" element={<ServicesPage />} />
           <Route path="/fornitori" element={<SuppliersPage />} />
+          <Route path="/template" element={<TemplatesPage />} />
         </Routes>
       </AppLayout>
     </BrowserRouter>
