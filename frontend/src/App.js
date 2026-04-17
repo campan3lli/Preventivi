@@ -966,6 +966,172 @@ const SortableStepCard = ({ id, idx, phaseStep, services, updateStep, removeStep
   );
 };
 
+// Quote PDF-style preview component
+const QuotePreview = ({ formData, clients, suppliers, calculateTotal }) => {
+  const client = clients.find(c => c.id === formData.client_id);
+  const mainSupplier = suppliers.find(s => s.is_main);
+  const isStepBased = formData.quote_type === 'step' || formData.quote_type === 'ibrido';
+  const dateStr = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit' });
+
+  const allServices = [...(formData.services || [])];
+  (formData.steps || []).forEach(st => { allServices.push(...(st.services || [])); });
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg overflow-hidden border" data-testid="quote-preview">
+      {/* Cover page */}
+      <div className="bg-[#002fa7] text-white p-10 min-h-[280px] flex flex-col justify-between">
+        <div>
+          <img src="https://customer-assets.emergentagent.com/job_quote-builder-217/artifacts/sliapkzx_3.png" alt="Logo" className="h-12 mb-6" />
+          <p className="text-sm opacity-70 tracking-widest uppercase">Limone Blu Studio</p>
+        </div>
+        <div>
+          <h2 className="text-4xl font-bold tracking-tight mb-3">PREVENTIVO</h2>
+          <p className="text-lg opacity-90">N. ---/2026</p>
+          <p className="text-sm opacity-60 mt-4 max-w-md">Questo documento è un preventivo collettivo basato sui costi di freelancer operanti all'interno dello studio.</p>
+        </div>
+      </div>
+
+      {/* Content pages */}
+      <div className="p-8 space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-start border-b pb-4">
+          <div>
+            <p className="text-[#002fa7] font-bold text-lg">LIMONE BLU STUDIO</p>
+            <p className="text-xs text-gray-400">Data: {dateStr}</p>
+          </div>
+          <p className="text-sm text-gray-600">Og. {formData.subject || '—'}</p>
+        </div>
+
+        {/* Supplier / Client */}
+        <div className="grid grid-cols-2 gap-8">
+          <div>
+            <p className="text-[#002fa7] font-bold text-sm mb-2">Fornitore</p>
+            {mainSupplier ? (
+              <div className="text-xs text-gray-600 space-y-0.5">
+                <p className="font-semibold text-gray-800">{mainSupplier.name}</p>
+                <p>{mainSupplier.legal_name}</p>
+                <p>{mainSupplier.address}</p>
+                {mainSupplier.vat_number && <p>P.IVA {mainSupplier.vat_number}</p>}
+                {mainSupplier.email && <p>{mainSupplier.email}</p>}
+              </div>
+            ) : <p className="text-xs text-gray-400 italic">Nessun fornitore</p>}
+          </div>
+          <div>
+            <p className="text-[#002fa7] font-bold text-sm mb-2">Cliente</p>
+            {client ? (
+              <div className="text-xs text-gray-600 space-y-0.5">
+                <p className="font-semibold text-gray-800">{client.company_name}</p>
+                <p>{client.address}</p>
+                <p>P.IVA {client.vat_number}</p>
+                {client.phone && <p>{client.phone}</p>}
+                <p>{client.email}</p>
+              </div>
+            ) : <p className="text-xs text-gray-400 italic">Seleziona un cliente</p>}
+          </div>
+        </div>
+
+        {/* Premise */}
+        {formData.premise && (
+          <div>
+            <p className="text-[#002fa7] font-bold text-sm mb-1">Premessa</p>
+            <p className="text-sm text-gray-600 leading-relaxed">{formData.premise}</p>
+          </div>
+        )}
+
+        {/* Methodology */}
+        {formData.methodology && (
+          <div>
+            <p className="text-[#002fa7] font-bold text-sm mb-1">Metodologia e approccio</p>
+            <p className="text-sm text-gray-600 leading-relaxed">{formData.methodology}</p>
+          </div>
+        )}
+
+        {/* Steps / Phases */}
+        {isStepBased && formData.steps.length > 0 && (
+          <div>
+            <p className="text-[#002fa7] font-bold text-sm mb-3">Fasi del progetto</p>
+            <div className="space-y-4">
+              {formData.steps.map((phaseStep, idx) => (
+                <div key={idx} className="border-l-3 border-[#002fa7] pl-4 py-1" style={{ borderLeftWidth: '3px', borderLeftColor: '#002fa7' }}>
+                  <p className="font-semibold text-sm text-[#002fa7]">Fase {phaseStep.step_number}: {phaseStep.title || 'Senza titolo'}</p>
+                  {phaseStep.duration && <p className="text-xs text-gray-400 italic">Richiede {phaseStep.duration}</p>}
+                  {phaseStep.description && <p className="text-xs text-gray-600 mt-1">{phaseStep.description}</p>}
+                  {phaseStep.output && <p className="text-xs mt-1"><span className="font-semibold">Output:</span> {phaseStep.output}</p>}
+                  {phaseStep.services.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {phaseStep.services.map((svc, sIdx) => (
+                        <div key={sIdx} className="flex justify-between text-xs bg-gray-50 rounded px-2 py-1">
+                          <span className="text-gray-700">{svc.service_name}</span>
+                          <span className="font-semibold text-[#002fa7] ml-2 whitespace-nowrap">{formatPrice(svc.price, svc.price_type)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Proposta economica */}
+        <div>
+          <p className="text-[#002fa7] font-bold text-sm mb-3">Proposta economica</p>
+          <div className="border rounded-lg overflow-hidden">
+            <div className="bg-[#002fa7] text-white px-4 py-2.5 grid grid-cols-[1fr_auto] text-xs font-semibold">
+              <span>Servizio</span>
+              <span className="text-right">Prezzo</span>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {allServices.filter(s => s.is_selected).map((svc, idx) => (
+                <div key={idx} className="px-4 py-3 grid grid-cols-[1fr_auto] items-start gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{svc.service_name}</p>
+                    {svc.sub_items && svc.sub_items.length > 0 && (
+                      <div className="mt-1 space-y-0.5">
+                        {svc.sub_items.map((item, i) => (
+                          <p key={i} className="text-[11px] text-gray-400 pl-1">- {item}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-sm font-bold text-[#002fa7] whitespace-nowrap">{formatPrice(svc.price, svc.price_type)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="border-t-2 border-[#002fa7] px-4 py-3 grid grid-cols-[1fr_auto] items-center">
+              <span className="font-bold text-sm">TOTALE</span>
+              <span className="font-bold text-lg text-[#002fa7]">{formatPrice(calculateTotal(), 'una_tantum')}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Info aggiuntive */}
+        <div className="border-t pt-6 space-y-2">
+          <p className="text-[#002fa7] font-bold text-sm mb-2">Info aggiuntive</p>
+          <p className="text-xs text-gray-600"><span className="font-semibold">Validità:</span> {formData.validity_days || 30} giorni dalla data di emissione.</p>
+          <p className="text-xs text-gray-600"><span className="font-semibold">Riservatezza:</span> Il presente documento è riservato e non può essere diffuso a terzi.</p>
+          {formData.delivery_time && <p className="text-xs text-gray-600"><span className="font-semibold">Tempi di consegna:</span> {formData.delivery_time}</p>}
+          <p className="text-xs text-gray-600"><span className="font-semibold">Modalità di pagamento:</span> {formData.payment_terms}</p>
+          <p className="text-xs text-gray-600"><span className="font-semibold">Modalità di accettazione:</span> Inviare il presente documento firmato e timbrato a info@limoneblu.it</p>
+          {formData.extra_notes && <p className="text-xs text-gray-600"><span className="font-semibold">Note:</span> {formData.extra_notes}</p>}
+        </div>
+
+        {/* Signature line */}
+        <div className="pt-8">
+          <div className="w-60 border-t border-gray-300 pt-2">
+            <p className="text-xs text-gray-400">Firma del Rappresentante legale</p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center pt-4 border-t">
+          <p className="text-xs text-gray-300 italic">enjoy the juice.</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // New/Edit Quote page
 const NewQuotePage = () => {
   const navigate = useNavigate();
@@ -1055,7 +1221,8 @@ const NewQuotePage = () => {
   ];
 
   const isStepBased = formData.quote_type === 'step' || formData.quote_type === 'ibrido';
-  const totalSteps = isStepBased ? 4 : 3;
+  const totalSteps = 4;
+  const lastStep = 4;
 
   const toggleService = (service) => {
     const existing = formData.services.find(s => s.service_id === service.id);
@@ -1335,8 +1502,8 @@ const NewQuotePage = () => {
         </Card>
       )}
 
-      {/* Step 3 (or 4 for step-based): Details */}
-      {((step === 3 && !isStepBased) || (step === 3 && isStepBased)) && (
+      {/* Step 3: Details */}
+      {step === 3 && (
         <Card className="animate-slideIn">
           <CardHeader><CardTitle>Dettagli Aggiuntivi</CardTitle></CardHeader>
           <CardContent className="space-y-6">
@@ -1395,12 +1562,36 @@ const NewQuotePage = () => {
 
             <div className="flex justify-between">
               <Button variant="outline" onClick={() => setStep(2)}>Indietro</Button>
-              <Button onClick={handleSubmit} className="btn-secondary gap-2" disabled={loading} data-testid="create-quote-btn">
-                {loading ? 'Salvataggio...' : isEditing ? 'Aggiorna Preventivo' : 'Crea Preventivo'}
+              <Button onClick={() => setStep(lastStep)} className="btn-primary gap-2" data-testid="next-step-3">
+                Anteprima <ChevronRight size={18} />
               </Button>
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Last Step: Preview */}
+      {step === lastStep && (
+        <div className="animate-slideIn space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Anteprima Preventivo</CardTitle>
+                <Badge className="bg-[#dbf637] text-[#1a281f]">Anteprima</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <QuotePreview formData={formData} clients={clients} suppliers={suppliers} calculateTotal={calculateTotal} />
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-between pb-16">
+            <Button variant="outline" onClick={() => setStep(lastStep - 1)}>Indietro</Button>
+            <Button onClick={handleSubmit} className="btn-secondary gap-2" disabled={loading} data-testid="create-quote-btn">
+              {loading ? 'Salvataggio...' : isEditing ? 'Aggiorna Preventivo' : 'Crea Preventivo'}
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );
