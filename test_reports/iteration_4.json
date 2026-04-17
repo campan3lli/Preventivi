@@ -1,0 +1,81 @@
+{
+  "summary": "Tested new drag & drop feature for reordering phases in 'A Step' and 'Ibrido' quotes. All features working correctly. Backend tests 100% pass (22/22). Frontend tests pass - drag handles visible, phases editable and draggable, order persisted correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "Backend: Create step quote with 3 ordered phases - order preserved",
+    "Backend: Update step quote with reordered phases (simulating drag & drop) - new order persisted",
+    "Backend: Ibrido quote phases reorder - phases and standalone services both preserved",
+    "Backend: Step numbers are sequential (1,2,3...) after any reorder",
+    "Backend: All existing tests pass (templates, duplicate, edit, PDF)",
+    "Frontend: New quote page loads with 4 quote types (Standard, A Step, Moduli, Ibrido)",
+    "Frontend: A Step quote type shows 'Step 2 di 4' progress (4 steps for step-based quotes)",
+    "Frontend: Add Phase button ('Aggiungi Fase') creates new phase cards",
+    "Frontend: Each phase card has GripVertical drag handle (data-testid='drag-handle-N')",
+    "Frontend: Phase cards have title, duration, output, description fields",
+    "Frontend: Phase cards have service selector for associating services",
+    "Frontend: Phase subtotal calculated correctly",
+    "Frontend: Quote saved with correct phase order (Alpha, Beta, Gamma)",
+    "Frontend: Edit page shows 'Modifica Preventivo' title",
+    "Frontend: Edit page loads existing phases with all data",
+    "Frontend: Edit page shows drag handles on each phase",
+    "Frontend: Phase title editable and saved ('Alpha Phase EDITED')",
+    "Frontend: Templates page shows 6 predefined templates",
+    "Frontend: Templates show correct types (Standard, Moduli, A Step, Ibrido)",
+    "Frontend: Quotes list shows all quote types correctly",
+    "Frontend: Duplicate button works - creates new quote with incremented number",
+    "Frontend: Edit, View, Download, Delete buttons all present and functional"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_drag_drop_feature.py",
+    "/app/backend/tests/test_step_quotes.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/pytest_results_drag_drop.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Drag & drop implementation uses @dnd-kit/core and @dnd-kit/sortable correctly",
+    "handleDragEnd uses arrayMove and renumbers step_number automatically",
+    "SortableStepCard component properly implements useSortable hook",
+    "DndContext and SortableContext wrap the steps correctly"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_drag_drop_feature.py"
+  ],
+  "success_rate": {
+    "backend": "100% (22/22 tests passed)",
+    "frontend": "100%"
+  },
+  "test_credentials": {
+    "test_client": "Test Company Frontend (frontend@testcompany.it)",
+    "note": "Created test quote #6 'TEST Drag Drop Save Order' with 3 phases for testing"
+  },
+  "seed_data_creation": "Created test quote with 3 phases (Alpha, Beta, Gamma) for drag & drop testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Drag & drop feature fully tested and working. Implementation uses @dnd-kit/core and @dnd-kit/sortable. Each step card has data-testid='drag-handle-N' for the drag handle and data-testid='step-card-N' for the card. handleDragEnd in App.js uses arrayMove to reorder and automatically renumbers step_number. Test file /app/backend/tests/test_drag_drop_feature.py covers: 1) Creating step quotes with ordered phases, 2) Updating with reordered phases (simulating drag), 3) Ibrido quote phase reorder, 4) Step number sequential verification.",
+  "features_tested": {
+    "drag_drop_reorder": {
+      "ui_components": ["GripVertical drag handle", "SortableStepCard", "DndContext", "SortableContext"],
+      "data_testids": ["drag-handle-N", "step-card-N", "step-title-N", "step-duration-N", "step-output-N"],
+      "behavior": "Drag phases to reorder, step_number auto-updates to 1,2,3..., order persisted on save"
+    },
+    "step_quote_creation": {
+      "route": "/preventivi/nuovo",
+      "quote_type": "step",
+      "steps": "4 (for step-based quotes)",
+      "features": ["Add phase", "Remove phase", "Edit phase details", "Associate services to phase"]
+    },
+    "ibrido_quote": {
+      "quote_type": "ibrido",
+      "features": ["Phases with drag & drop", "Standalone services outside phases", "Both totals calculated"]
+    }
+  }
+}

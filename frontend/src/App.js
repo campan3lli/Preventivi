@@ -16,8 +16,11 @@ import {
   FileText, Users, Package, Home, Plus, Search, Edit, Trash2, 
   Download, Mail, Eye, ChevronRight, List, Layers, Grid3X3, Shuffle,
   Building2, Phone, MapPin, Receipt, Settings, CheckCircle2, Copy,
-  BookTemplate, Bookmark
+  BookTemplate, Bookmark, GripVertical
 } from "lucide-react";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -1081,6 +1084,83 @@ const NewQuotePage = () => {
     </ScrollArea>
   );
 
+  // Drag and drop for steps
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = parseInt(active.id.split('-')[1]);
+    const newIndex = parseInt(over.id.split('-')[1]);
+    setFormData(prev => {
+      const reordered = arrayMove(prev.steps, oldIndex, newIndex).map((s, i) => ({ ...s, step_number: i + 1 }));
+      return { ...prev, steps: reordered };
+    });
+  };
+
+  // Sortable step card component
+  const SortableStepCard = ({ id, idx, phaseStep }) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+    const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 50 : 'auto' };
+    return (
+      <div ref={setNodeRef} style={style} data-testid={`step-card-${idx}`}>
+        <Card className={`border-2 ${isDragging ? 'border-[#002fa7] shadow-lg' : 'border-gray-200'}`}>
+          <CardContent className="p-5">
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex items-center gap-3">
+                <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-100 touch-none" data-testid={`drag-handle-${idx}`}>
+                  <GripVertical size={20} className="text-gray-400" />
+                </div>
+                <div className="w-10 h-10 bg-[#002fa7] text-white rounded-lg flex items-center justify-center font-bold text-lg">
+                  {phaseStep.step_number}
+                </div>
+                <Input value={phaseStep.title} onChange={(e) => updateStep(idx, 'title', e.target.value)}
+                  placeholder="Titolo fase (es. Onboarding e set-up)" className="font-semibold text-lg border-0 focus:ring-0 p-0 h-auto"
+                  data-testid={`step-title-${idx}`} />
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => removeStep(idx)} className="text-red-600" data-testid={`remove-step-${idx}`}>
+                <Trash2 size={16} />
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="form-label">Durata</label>
+                <Input value={phaseStep.duration} onChange={(e) => updateStep(idx, 'duration', e.target.value)}
+                  placeholder="Es. 5 giorni" data-testid={`step-duration-${idx}`} />
+              </div>
+              <div>
+                <label className="form-label">Output</label>
+                <Input value={phaseStep.output} onChange={(e) => updateStep(idx, 'output', e.target.value)}
+                  placeholder="Es. Brief approvato, Calendario" data-testid={`step-output-${idx}`} />
+              </div>
+            </div>
+            <div>
+              <label className="form-label">Descrizione</label>
+              <Textarea value={phaseStep.description} onChange={(e) => updateStep(idx, 'description', e.target.value)}
+                placeholder="Descrizione della fase..." rows={2} data-testid={`step-desc-${idx}`} />
+            </div>
+            <div className="mt-4">
+              <label className="form-label">Servizi associati a questa fase</label>
+              <ServiceSelector selectedServices={phaseStep.services} onToggle={(svc) => toggleStepService(idx, svc)} compact />
+            </div>
+            {phaseStep.services.length > 0 && (
+              <div className="mt-3 pt-3 border-t">
+                <div className="flex justify-between text-sm font-semibold">
+                  <span>Subtotale fase</span>
+                  <span className="text-[#002fa7]">
+                    {formatPrice(phaseStep.services.reduce((sum, s) => sum + s.price * s.quantity, 0), 'una_tantum')}
+                  </span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   return (
     <div className="animate-fadeIn" data-testid="new-quote-page">
       <div className="page-header">
@@ -1181,58 +1261,15 @@ const NewQuotePage = () => {
                 <p className="empty-state-desc">Aggiungi le fasi del progetto con i relativi servizi</p>
               </div>
             )}
-            <div className="space-y-6">
-              {formData.steps.map((phaseStep, idx) => (
-                <Card key={idx} className="border-2 border-gray-200" data-testid={`step-card-${idx}`}>
-                  <CardContent className="p-5">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-[#002fa7] text-white rounded-lg flex items-center justify-center font-bold text-lg">
-                          {phaseStep.step_number}
-                        </div>
-                        <Input value={phaseStep.title} onChange={(e) => updateStep(idx, 'title', e.target.value)}
-                          placeholder="Titolo fase (es. Onboarding e set-up)" className="font-semibold text-lg border-0 focus:ring-0 p-0 h-auto"
-                          data-testid={`step-title-${idx}`} />
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => removeStep(idx)} className="text-red-600" data-testid={`remove-step-${idx}`}>
-                        <Trash2 size={16} />
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <label className="form-label">Durata</label>
-                        <Input value={phaseStep.duration} onChange={(e) => updateStep(idx, 'duration', e.target.value)}
-                          placeholder="Es. 5 giorni" data-testid={`step-duration-${idx}`} />
-                      </div>
-                      <div>
-                        <label className="form-label">Output</label>
-                        <Input value={phaseStep.output} onChange={(e) => updateStep(idx, 'output', e.target.value)}
-                          placeholder="Es. Brief approvato, Calendario" data-testid={`step-output-${idx}`} />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="form-label">Descrizione</label>
-                      <Textarea value={phaseStep.description} onChange={(e) => updateStep(idx, 'description', e.target.value)}
-                        placeholder="Descrizione della fase..." rows={2} data-testid={`step-desc-${idx}`} />
-                    </div>
-                    <div className="mt-4">
-                      <label className="form-label">Servizi associati a questa fase</label>
-                      <ServiceSelector selectedServices={phaseStep.services} onToggle={(svc) => toggleStepService(idx, svc)} compact />
-                    </div>
-                    {phaseStep.services.length > 0 && (
-                      <div className="mt-3 pt-3 border-t">
-                        <div className="flex justify-between text-sm font-semibold">
-                          <span>Subtotale fase</span>
-                          <span className="text-[#002fa7]">
-                            {formatPrice(phaseStep.services.reduce((sum, s) => sum + s.price * s.quantity, 0), 'una_tantum')}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={formData.steps.map((_, i) => `step-${i}`)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-6">
+                  {formData.steps.map((phaseStep, idx) => (
+                    <SortableStepCard key={`step-${idx}`} id={`step-${idx}`} idx={idx} phaseStep={phaseStep} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
 
             {/* For ibrido: also show standalone services */}
             {formData.quote_type === 'ibrido' && (
