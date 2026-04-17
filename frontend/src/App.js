@@ -8,7 +8,7 @@ import { Input } from "./components/ui/input";
 import { Textarea } from "./components/ui/textarea";
 import { Checkbox } from "./components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "./components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
 import { Badge } from "./components/ui/badge";
 import { ScrollArea } from "./components/ui/scroll-area";
@@ -350,6 +350,7 @@ const ClientsPage = () => {
         <DialogContent data-testid="client-modal">
           <DialogHeader>
             <DialogTitle>{editingClient ? 'Modifica Cliente' : 'Nuovo Cliente'}</DialogTitle>
+            <DialogDescription>Inserisci i dati del cliente per l'anagrafica</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
@@ -525,6 +526,7 @@ const ServicesPage = () => {
         <DialogContent data-testid="service-modal">
           <DialogHeader>
             <DialogTitle>{editingService ? 'Modifica Servizio' : 'Nuovo Servizio'}</DialogTitle>
+            <DialogDescription>Gestisci i dettagli e il prezzo del servizio</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
@@ -669,6 +671,7 @@ const SuppliersPage = () => {
         <DialogContent data-testid="supplier-modal">
           <DialogHeader>
             <DialogTitle>{editingSupplier ? 'Modifica Fornitore' : 'Nuovo Fornitore'}</DialogTitle>
+            <DialogDescription>Gestisci i dati del collaboratore</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
@@ -1343,6 +1346,7 @@ const QuoteDetailPage = () => {
         <DialogContent className="max-w-lg" data-testid="email-modal">
           <DialogHeader>
             <DialogTitle>Invia Preventivo via Email</DialogTitle>
+            <DialogDescription>Il PDF verrà allegato automaticamente all'email</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSendEmail}>
             <div className="space-y-4">
