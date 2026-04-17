@@ -1,0 +1,238 @@
+@import url('https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --blue: #002fa7;
+  --lime: #dbf637;
+  --white: #ffffff;
+  --dark-green: #1a281f;
+  --gray-100: #f8f9fa;
+  --gray-200: #e9ecef;
+  --gray-300: #dee2e6;
+  --gray-500: #6c757d;
+  --gray-700: #495057;
+  --gray-900: #212529;
+}
+
+body {
+  margin: 0;
+  font-family: 'Raleway', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--gray-100);
+  color: var(--dark-green);
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 150 25% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 150 25% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 25% 11%;
+    --primary: 223 100% 33%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 66 91% 59%;
+    --secondary-foreground: 150 25% 11%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 13% 35%;
+    --accent: 66 91% 59%;
+    --accent-foreground: 150 25% 11%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 223 100% 33%;
+    --chart-1: 223 100% 33%;
+    --chart-2: 66 91% 59%;
+    --chart-3: 150 25% 11%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gray-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-500);
+}
+
+/* Logo animation */
+.logo-spin {
+  animation: spin 20s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Custom button styles */
+.btn-primary {
+  background-color: var(--blue);
+  color: var(--white);
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: #001f7a;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background-color: var(--lime);
+  color: var(--dark-green);
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background-color: #c9e32f;
+  transform: translateY(-1px);
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: all 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 40px rgba(0, 47, 167, 0.1);
+}
+
+/* Sidebar active state */
+.sidebar-active {
+  background-color: var(--blue);
+  color: var(--white);
+}
+
+/* Quote type cards */
+.quote-type-card {
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.quote-type-card:hover {
+  border-color: var(--blue);
+}
+
+.quote-type-card.selected {
+  border-color: var(--blue);
+  background-color: rgba(0, 47, 167, 0.05);
+}
+
+/* Service checkbox */
+.service-checkbox {
+  transition: all 0.2s ease;
+}
+
+.service-checkbox.selected {
+  background-color: rgba(0, 47, 167, 0.05);
+  border-left: 3px solid var(--blue);
+}
+
+/* Price badge */
+.price-badge {
+  background-color: var(--lime);
+  color: var(--dark-green);
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+/* Status badges */
+.status-draft {
+  background-color: var(--gray-200);
+  color: var(--gray-700);
+}
+
+.status-sent {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.status-accepted {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-rejected {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+/* Toast custom styles */
+.toast-success {
+  background-color: var(--blue) !important;
+  color: var(--white) !important;
+}
+
+/* Table styles */
+.table-header {
+  background-color: var(--blue);
+  color: var(--white);
+}
+
+/* Input focus */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0, 47, 167, 0.1);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Debug wrapper */
+@layer base {
+  [data-debug-wrapper="true"] {
+    display: contents !important;
+  }
+}
