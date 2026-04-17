@@ -93,6 +93,7 @@ class Service(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     description: Optional[str] = None
+    sub_items: List[str] = []
     price: float
     price_type: str = "una_tantum"  # una_tantum, mensile, annuale, bimestrale
     category: str = "general"
@@ -101,6 +102,7 @@ class Service(BaseModel):
 class ServiceCreate(BaseModel):
     name: str
     description: Optional[str] = None
+    sub_items: List[str] = []
     price: float
     price_type: str = "una_tantum"
     category: str = "general"
@@ -109,6 +111,7 @@ class ServiceCreate(BaseModel):
 class ServiceUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    sub_items: Optional[List[str]] = None
     price: Optional[float] = None
     price_type: Optional[str] = None
     category: Optional[str] = None
@@ -118,6 +121,7 @@ class QuoteService(BaseModel):
     service_id: str
     service_name: str
     description: Optional[str] = None
+    sub_items: List[str] = []
     price: float
     price_type: str
     quantity: int = 1
@@ -446,7 +450,7 @@ async def generate_quote_pdf(quote_id: str):
         [Spacer(1, 20)],
         [Paragraph(f'<font color="white" size="12">{quote.get("quote_number", "")}/2026</font>', normal_style)],
         [Spacer(1, 30)],
-        [Paragraph(f'<font color="#dbf637" size="10">Questo documento è un preventivo collettivo basato sui costi di freelancer operanti all\'interno dello studio.</font>', small_style)],
+        [Paragraph('<font color="#dbf637" size="10">Questo documento è un preventivo collettivo basato sui costi di freelancer operanti all\'interno dello studio.</font>', small_style)],
     ]
     
     cover_table = Table(cover_data, colWidths=[16*cm])
@@ -468,7 +472,7 @@ async def generate_quote_pdf(quote_id: str):
     date_str = created_at.strftime("%d.%m.%y")
     
     header_data = [
-        [Paragraph(f'<b>LIMONE BLU STUDIO</b>', heading_style), Paragraph(f'Preventivo #{quote.get("quote_number", "")}', normal_style)],
+        [Paragraph('<b>LIMONE BLU STUDIO</b>', heading_style), Paragraph(f'Preventivo #{quote.get("quote_number", "")}', normal_style)],
         [Paragraph(f'Data: {date_str}', small_style), Paragraph(f'Og. {quote.get("subject", "")}', normal_style)],
     ]
     header_table = Table(header_data, colWidths=[8*cm, 8*cm])
@@ -526,57 +530,78 @@ async def generate_quote_pdf(quote_id: str):
     # Services section based on quote type
     quote_type = quote.get('quote_type', 'standard')
     
-    if quote_type == 'step' or quote_type == 'ibrido':
+    if quote_type in ('step', 'ibrido'):
         elements.append(Paragraph('<b>Fasi del progetto</b>', heading_style))
-        for step in quote.get('steps', []):
-            elements.append(Paragraph(f"<b>Fase {step.get('step_number', '')}: {step.get('title', '')}</b>", normal_style))
-            if step.get('duration'):
-                elements.append(Paragraph(f"<i>Richiede {step.get('duration')}</i>", small_style))
-            if step.get('description'):
-                elements.append(Paragraph(step['description'], normal_style))
-            if step.get('output'):
-                elements.append(Paragraph(f"<b>Output:</b> {step['output']}", normal_style))
-            elements.append(Spacer(1, 10))
+        for step_data in quote.get('steps', []):
+            step_title_style = ParagraphStyle('StepTitle', parent=styles['Normal'], fontSize=12, textColor=BLUE, fontName='Helvetica-Bold', spaceAfter=4)
+            elements.append(Paragraph(f"Fase {step_data.get('step_number', '')}: {step_data.get('title', '')}", step_title_style))
+            if step_data.get('duration'):
+                elements.append(Paragraph(f"<i>Richiede {step_data.get('duration')}</i>", small_style))
+            if step_data.get('description'):
+                elements.append(Paragraph(step_data['description'], normal_style))
+            if step_data.get('output'):
+                elements.append(Paragraph(f"<b>Output:</b> {step_data['output']}", normal_style))
+            # Show services within this step
+            for svc in step_data.get('services', []):
+                if svc.get('is_selected', True):
+                    elements.append(Spacer(1, 4))
+                    elements.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;<b>{svc.get('service_name', '')}</b> — {format_price(svc.get('price', 0), svc.get('price_type', 'una_tantum'))}", normal_style))
+                    for sub in svc.get('sub_items', []):
+                        elements.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• {sub}", small_style))
+            elements.append(Spacer(1, 12))
     
-    # Services table
+    # Services table - Proposta economica
     elements.append(Paragraph('<b>Proposta economica</b>', heading_style))
     
-    service_data = [['Servizio', 'Prezzo']]
-    all_services = quote.get('services', [])
+    all_services = list(quote.get('services', []))
     
-    # Also collect services from steps for ibrido type
-    if quote_type in ['step', 'ibrido']:
-        for step in quote.get('steps', []):
-            all_services.extend(step.get('services', []))
+    # Also collect services from steps
+    if quote_type in ('step', 'ibrido'):
+        for step_data in quote.get('steps', []):
+            all_services.extend(step_data.get('services', []))
     
     for svc in all_services:
         if svc.get('is_selected', True):
-            service_data.append([
-                Paragraph(f"<b>{svc.get('service_name', '')}</b><br/><font size='8'>{svc.get('description', '') or ''}</font>", normal_style),
+            svc_name = svc.get('service_name', '')
+            svc_desc = svc.get('description', '') or ''
+            sub_items = svc.get('sub_items', [])
+            sub_text = ""
+            for sub in sub_items:
+                sub_text += f"<br/>&nbsp;&nbsp;&nbsp;&nbsp;• {sub}"
+            
+            svc_block = f"<b>{svc_name}</b>"
+            if svc_desc:
+                svc_block += f"<br/><font size='8' color='#666666'>{svc_desc}</font>"
+            if sub_text:
+                svc_block += f"<font size='7' color='#444444'>{sub_text}</font>"
+            
+            elements.append(Spacer(1, 6))
+            svc_table_data = [[
+                Paragraph(svc_block, normal_style),
                 Paragraph(format_price(svc.get('price', 0), svc.get('price_type', 'una_tantum')), price_style)
-            ])
+            ]]
+            svc_table = Table(svc_table_data, colWidths=[12*cm, 4*cm])
+            svc_table.setStyle(TableStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('LINEBELOW', (0, 0), (-1, -1), 0.5, HexColor('#dddddd')),
+            ]))
+            elements.append(svc_table)
     
     # Total
     total = quote.get('total_amount', 0)
-    total_str = f"€ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    service_data.append(['', ''])
-    service_data.append([Paragraph('<b>TOTALE</b>', normal_style), Paragraph(f'<b>{total_str}</b>', price_style)])
-    
-    service_table = Table(service_data, colWidths=[12*cm, 4*cm])
-    service_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), BLUE),
-        ('TEXTCOLOR', (0, 0), (-1, 0), white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-        ('TOPPADDING', (0, 0), (-1, 0), 10),
-        ('VALIGN', (0, 1), (-1, -1), 'TOP'),
-        ('GRID', (0, 0), (-1, -3), 0.5, HexColor('#dddddd')),
-        ('TOPPADDING', (0, 1), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+    total_str = f"\u20ac {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    elements.append(Spacer(1, 10))
+    total_data = [[Paragraph('<b>TOTALE</b>', normal_style), Paragraph(f'<b>{total_str}</b>', price_style)]]
+    total_table = Table(total_data, colWidths=[12*cm, 4*cm])
+    total_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ('LINEABOVE', (0, 0), (-1, 0), 1.5, BLUE),
     ]))
-    elements.append(service_table)
+    elements.append(total_table)
     elements.append(Spacer(1, 20))
     
     # Additional info
@@ -724,42 +749,42 @@ async def seed_data():
     
     # Seed services
     services_data = [
-        {"id": str(uuid.uuid4()), "name": "Realizzazione sito web customizzato", "description": "Sito web personalizzato con design responsive, CMS, SEO di base e predisposizione GDPR", "price": 1500.00, "price_type": "una_tantum", "category": "web", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Realizzazione eCommerce + WooCommerce", "description": "E-commerce completo con WooCommerce, gestione prodotti, pagamenti e spedizioni", "price": 2500.00, "price_type": "una_tantum", "category": "web", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Manutenzione e aggiornamento annuale", "description": "Aggiornamenti, backup, monitoraggio sicurezza e supporto tecnico", "price": 250.00, "price_type": "annuale", "category": "web", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Landing page", "description": "Pagina di atterraggio ottimizzata per conversioni", "price": 1000.00, "price_type": "una_tantum", "category": "web", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Configurazione iniziale account social", "description": "Setup business manager, account pubblicitario, profili business", "price": 100.00, "price_type": "una_tantum", "category": "social", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Social media management Essential", "description": "Gestione base dei canali social con piano editoriale mensile", "price": 250.00, "price_type": "mensile", "category": "social", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Social media management Pro", "description": "Gestione completa con strategia, contenuti, community management", "price": 350.00, "price_type": "mensile", "category": "social", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Creazione contenuti foto e video", "description": "Produzione di contenuti visuali per social media", "price": 330.00, "price_type": "bimestrale", "category": "content", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Copywriting caption e testi", "description": "Scrittura professionale per social e web", "price": 150.00, "price_type": "mensile", "category": "content", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Pianificazione strategica PED + calendario editoriale", "description": "Piano editoriale trimestrale e calendario mensile", "price": 200.00, "price_type": "una_tantum", "category": "strategy", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Affiancamento marketing", "description": "Consulenza e supporto strategico continuativo", "price": 150.00, "price_type": "mensile", "category": "strategy", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Analisi e strategia", "description": "Analisi di mercato, competitor e definizione strategia", "price": 500.00, "price_type": "una_tantum", "category": "strategy", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "ADV Awareness Meta (Facebook + Instagram)", "description": "Creazione e gestione campagne awareness su Meta", "price": 70.00, "price_type": "una_tantum", "category": "advertising", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "ADV Conversione/Lead Generation", "description": "Campagne ottimizzate per conversioni e lead", "price": 300.00, "price_type": "una_tantum", "category": "advertising", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Gestione campagne Google Ads Search", "description": "Gestione campagne search su Google Ads", "price": 150.00, "price_type": "mensile", "category": "advertising", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Gestione campagne Google Ads Performance Max", "description": "Gestione campagne Performance Max", "price": 200.00, "price_type": "mensile", "category": "advertising", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Setup ecosistema Google Ads + Analytics", "description": "Configurazione account, GA4, Tag Manager, dashboard", "price": 350.00, "price_type": "una_tantum", "category": "advertising", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Revisione brand e identità visiva", "description": "Analisi e refresh dell'identità visiva esistente", "price": 150.00, "price_type": "una_tantum", "category": "branding", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Allineamento brand identity base", "description": "Definizione linee guida grafiche essenziali", "price": 500.00, "price_type": "una_tantum", "category": "branding", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Allineamento brand identity pro", "description": "Brand identity completa con brand kit", "price": 1200.00, "price_type": "una_tantum", "category": "branding", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Campagna di lancio attività", "description": "Strategia e esecuzione lancio nuovo brand/prodotto", "price": 800.00, "price_type": "una_tantum", "category": "strategy", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Consulenza marketing", "description": "Consulenza strategica e operativa", "price": 500.00, "price_type": "mensile", "category": "strategy", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "SEO di base", "description": "Ottimizzazione SEO on-page essenziale", "price": 300.00, "price_type": "una_tantum", "category": "web", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "SEO avanzata", "description": "Strategia SEO completa con link building", "price": 500.00, "price_type": "mensile", "category": "web", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Local SEO Google Business Profile", "description": "Ottimizzazione profilo Google Business", "price": 200.00, "price_type": "una_tantum", "category": "web", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Gestione multilingua", "description": "Configurazione e gestione sito multilingua", "price": 400.00, "price_type": "una_tantum", "category": "web", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Integrazione sistema di booking online", "description": "Integrazione sistema prenotazioni", "price": 350.00, "price_type": "una_tantum", "category": "web", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Presenza OTA", "description": "Configurazione e gestione presenza su OTA", "price": 300.00, "price_type": "una_tantum", "category": "web", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Email marketing", "description": "Setup e gestione campagne email", "price": 200.00, "price_type": "mensile", "category": "marketing", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Produzione asset creativi per campagne", "description": "Creazione grafiche e video per advertising", "price": 250.00, "price_type": "una_tantum", "category": "content", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Supporto recupero account Meta compromesso", "description": "Assistenza per recupero account social compromessi", "price": 150.00, "price_type": "una_tantum", "category": "support", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Fotografia progetto", "description": "Servizio fotografico professionale", "price": 800.00, "price_type": "una_tantum", "category": "content", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Video produzione", "description": "Produzione video professionale", "price": 1000.00, "price_type": "una_tantum", "category": "content", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Formazione marketing (6 ore)", "description": "Formazione pratica sulla gestione social e marketing", "price": 300.00, "price_type": "una_tantum", "category": "training", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Strategia di comunicazione", "description": "Definizione strategia comunicativa integrata", "price": 1200.00, "price_type": "una_tantum", "category": "strategy", "is_active": True},
-        {"id": str(uuid.uuid4()), "name": "Progettazione grafica", "description": "Design materiale grafico coordinato", "price": 1900.00, "price_type": "una_tantum", "category": "branding", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Realizzazione sito web customizzato", "description": "Sito web personalizzato con design responsive, CMS, SEO di base e predisposizione GDPR", "sub_items": ["Progettazione grafica e personalizzazione secondo le esigenze del cliente", "Design responsive per desktop, tablet e mobile", "Inserimento di elementi dinamici per differenziazioni e valore visivo", "Possibilità di inserire e modificare contenuti testuali ed immagini in autonomia", "Progettazione secondo standard di usabilità e accessibilità", "SEO di base e revisione dei testi", "Configurazione Google Analytics", "Predisposizione GDPR: Cookie Policy, Privacy Policy, Termini e condizioni e banner Cookies"], "price": 1500.00, "price_type": "una_tantum", "category": "web", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Realizzazione eCommerce + WooCommerce", "description": "E-commerce completo con WooCommerce, gestione prodotti, pagamenti e spedizioni", "sub_items": ["Installazione e configurazione WooCommerce", "Design e personalizzazione del tema", "Configurazione metodi di pagamento (Stripe, PayPal)", "Configurazione spedizioni e calcolo tariffe", "Gestione catalogo prodotti con varianti", "Pagine carrello, checkout e account cliente", "Predisposizione GDPR e Cookie Policy", "SEO di base per prodotti e categorie"], "price": 2500.00, "price_type": "una_tantum", "category": "web", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Manutenzione e aggiornamento annuale", "description": "Aggiornamenti, backup, monitoraggio sicurezza e supporto tecnico", "sub_items": ["Aggiornamenti plugin e tema", "Rinnovo dominio, hosting e caselle email con backup", "Supporto tecnico e assistenza fino a 5h/anno", "Rinnovo licenze e applicazioni"], "price": 250.00, "price_type": "annuale", "category": "web", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Landing page", "description": "Pagina di atterraggio ottimizzata per conversioni", "sub_items": ["Analisi e studio piattaforma", "Studio del layout e ideazione grafica", "Settaggio e aggiustamenti responsive", "Predisposizione GDPR", "Configurazione GA4", "Consulenza per modifiche future in autonomia"], "price": 1000.00, "price_type": "una_tantum", "category": "web", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Configurazione iniziale account social", "description": "Setup business manager, account pubblicitario, profili business", "sub_items": ["Ottimizzazione profili social Facebook e Instagram", "Settaggio business manager", "Settaggio corretto account pubblicitario intestato all'attività del cliente"], "price": 100.00, "price_type": "una_tantum", "category": "social", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Social media management Essential", "description": "Gestione base dei canali social con piano editoriale mensile", "sub_items": ["Creazione calendario mensile per attività di promozione", "Definizione e mantenimento dell'identità visiva", "Creazione e gestione di 2 storie dove necessario", "Ideazione e pubblicazione di 2 post settimanali (statici, caroselli e Reels)", "Attività di copywriting per caption social", "Monitoraggio base delle performance (engagement, reach, salvataggi)"], "price": 250.00, "price_type": "mensile", "category": "social", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Social media management Pro", "description": "Gestione completa con strategia, contenuti, community management", "sub_items": ["Analisi e strategia", "Adeguamento della strategia di comunicazione", "Call mensile o riunione in presenza 45min", "PED mensile e calendario editoriale", "Creazione e condivisione di layout per format post e stories", "Graphic Design per creazione di grafiche", "Aggregatore di link per ottimizzazione", "Attività di copywriting", "Pubblicazione da 6 a 8 post al mese", "Micro-shooting lite bimestrale: 75-90 min con output foto + Reels"], "price": 350.00, "price_type": "mensile", "category": "social", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Creazione contenuti foto e video", "description": "Produzione di contenuti visuali per social media", "sub_items": ["Foto e video che raccontino l'atmosfera dell'attività", "Foto e video di preparazione prodotti/servizi", "Video parlati e rubriche per campagne e promozione", "Scrittura script video"], "price": 330.00, "price_type": "bimestrale", "category": "content", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Copywriting caption e testi", "description": "Scrittura professionale per social e web", "sub_items": ["Scrittura caption social per post e stories", "Scrittura testi per blog e sito web", "Storytelling e narrazione del brand", "Revisione e ottimizzazione testi esistenti"], "price": 150.00, "price_type": "mensile", "category": "content", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Pianificazione strategica PED + calendario editoriale", "description": "Piano editoriale trimestrale e calendario mensile", "sub_items": ["PED trimestrale basato su obiettivi strategici", "Calendario editoriale mensile condiviso con il cliente", "Definizione dei pillar comunicativi", "Pianificazione rubriche e format ricorrenti"], "price": 200.00, "price_type": "una_tantum", "category": "strategy", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Affiancamento marketing", "description": "Consulenza e supporto strategico continuativo", "sub_items": ["Incontri periodici di confronto e consulenza strategica", "Monitoraggio andamento attività e analisi risultati", "Valutazione KPI e individuazione nuove opportunità", "Analisi dei dati e dei trend mensile", "Adeguamento del Piano Editoriale mensile", "Definizione dei pillar comunicativi mensili"], "price": 150.00, "price_type": "mensile", "category": "strategy", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Analisi e strategia", "description": "Analisi di mercato, competitor e definizione strategia", "sub_items": ["Analisi dei competitor e posizionamento", "Analisi del target e contesti di acquisto", "Definizione posizionamento differenziante", "Touchpoint audit sui canali esistenti", "Documento con opportunità, rischi e direzioni consigliate"], "price": 500.00, "price_type": "una_tantum", "category": "strategy", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "ADV Awareness Meta (Facebook + Instagram)", "description": "Creazione e gestione campagne awareness su Meta", "sub_items": ["Creazione e gestione campagna pubblicitaria per Facebook e Instagram", "Ricerca e ideazione di un pubblico target per l'ADV", "Studio e ideazione contenuti multimediali per la campagna", "Ideazione del copy per l'ADV", "Attività di monitoraggio", "Budget a discrezione del cliente da versare direttamente a Meta (non compreso)"], "price": 70.00, "price_type": "una_tantum", "category": "advertising", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "ADV Conversione/Lead Generation", "description": "Campagne ottimizzate per conversioni e lead", "sub_items": ["Creazione campagne lead generation su Facebook e Instagram", "Configurazione moduli di contatto e landing", "Ottimizzazione audience e targeting", "A/B testing creatività e copy", "Monitoraggio e ottimizzazione continua", "Budget ads non compreso"], "price": 300.00, "price_type": "una_tantum", "category": "advertising", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Gestione campagne Google Ads Search", "description": "Gestione campagne search su Google Ads", "sub_items": ["Gestione attiva e ottimizzazione continua", "Verifica della qualità delle query", "Aggiornamento annunci", "Manutenzione della dashboard", "Comunicazione periodica risultati"], "price": 150.00, "price_type": "mensile", "category": "advertising", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Gestione campagne Google Ads Performance Max", "description": "Gestione campagne Performance Max", "sub_items": ["Setup e gestione campagne Performance Max", "Ottimizzazione feed prodotti e asset creativi", "Monitoraggio conversioni e ROAS", "Report periodici con Looker Studio"], "price": 200.00, "price_type": "mensile", "category": "advertising", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Setup ecosistema Google Ads + Analytics", "description": "Configurazione account, GA4, Tag Manager, dashboard", "sub_items": ["Configurazione metodo di pagamento", "Collegamenti Ads + GA4 + Tag Manager", "Implementazione tracciamenti", "Analisi keyword iniziale e impianto campagne", "Creazione dashboard Looker Studio", "Prima ottimizzazione"], "price": 350.00, "price_type": "una_tantum", "category": "advertising", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Revisione brand e identità visiva", "description": "Analisi e refresh dell'identità visiva esistente", "sub_items": ["Analisi brand attuale", "Ottimizzazione logo, aggiornamento palette colori e font", "Allineamento grafico ai canali social"], "price": 150.00, "price_type": "una_tantum", "category": "branding", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Allineamento brand identity base", "description": "Definizione linee guida grafiche essenziali", "sub_items": ["Brand Discovery Questionnaire", "Definizione purpose, promessa, valori", "Logo design (proposte e revisioni)", "Palette colori e tipografia", "Linee guida grafiche essenziali"], "price": 500.00, "price_type": "una_tantum", "category": "branding", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Allineamento brand identity pro", "description": "Brand identity completa con brand kit", "sub_items": ["Brand Discovery Questionnaire e raccolta materiali", "Analisi competitor e posizionamento", "Brand Strategy Deck (purpose, promessa, personalità, tone of voice)", "Logo system (primario, secondario, monogramma)", "Palette colori, tipografia, pattern, elementi grafici", "Art direction (stile fotografico, texture, materiali)", "Brand Guidelines PDF con regole d'uso", "Template base per social, banner, schede prodotto", "Handover strutturato con file organizzati"], "price": 1200.00, "price_type": "una_tantum", "category": "branding", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Campagna di lancio attività", "description": "Strategia e esecuzione lancio nuovo brand/prodotto", "sub_items": ["Definizione strategia di lancio", "Piano editoriale dedicato al lancio", "Creazione contenuti grafici e testuali", "Campagne ADV di awareness e conversione", "Coordinamento canali online e offline"], "price": 800.00, "price_type": "una_tantum", "category": "strategy", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Consulenza marketing", "description": "Consulenza strategica e operativa", "sub_items": ["Analisi del contesto e posizionamento", "Adeguamento continuo della strategia di comunicazione", "Call mensile o riunione in presenza 45min", "PED trimestrale e calendario mensile", "Supporto alle attività grafiche secondo necessità", "Consulenza nel copywriting"], "price": 500.00, "price_type": "mensile", "category": "strategy", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "SEO di base", "description": "Ottimizzazione SEO on-page essenziale", "sub_items": ["Analisi keyword e struttura sito", "Ottimizzazione meta tag (title, description)", "Ottimizzazione contenuti testuali", "Configurazione sitemap e robots.txt", "Registrazione su Google Search Console"], "price": 300.00, "price_type": "una_tantum", "category": "web", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "SEO avanzata", "description": "Strategia SEO completa con link building", "sub_items": ["Audit SEO completo del sito", "Strategia keyword e contenuti", "Ottimizzazione tecnica (velocità, struttura URL, schema markup)", "Link building e digital PR", "Report mensile con analisi posizionamenti", "Ottimizzazione continua basata sui dati"], "price": 500.00, "price_type": "mensile", "category": "web", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Local SEO Google Business Profile", "description": "Ottimizzazione profilo Google Business", "sub_items": ["Creazione o ottimizzazione scheda Google Business", "Inserimento informazioni, foto, orari", "Strategia recensioni e risposte", "Monitoraggio posizionamento locale"], "price": 200.00, "price_type": "una_tantum", "category": "web", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Gestione multilingua", "description": "Configurazione e gestione sito multilingua", "sub_items": ["Setup plugin multilingua (WPML/Polylang)", "Configurazione struttura URL per lingue", "Coordinamento traduzioni", "Ottimizzazione SEO per ogni lingua"], "price": 400.00, "price_type": "una_tantum", "category": "web", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Integrazione sistema di booking online", "description": "Integrazione sistema prenotazioni", "sub_items": ["Analisi esigenze di prenotazione", "Installazione e configurazione plugin booking", "Personalizzazione calendario e disponibilità", "Configurazione notifiche email", "Test e ottimizzazione flusso di prenotazione"], "price": 350.00, "price_type": "una_tantum", "category": "web", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Presenza OTA", "description": "Configurazione e gestione presenza su OTA", "sub_items": ["Setup profili su piattaforme OTA", "Ottimizzazione descrizioni e foto", "Gestione tariffe e disponibilità", "Monitoraggio recensioni"], "price": 300.00, "price_type": "una_tantum", "category": "web", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Email marketing", "description": "Setup e gestione campagne email", "sub_items": ["Setup piattaforma email marketing", "Design template email responsive", "Segmentazione lista contatti", "Creazione e invio newsletter periodiche", "Automazioni email (welcome, follow-up)", "Report performance (open rate, click rate)"], "price": 200.00, "price_type": "mensile", "category": "marketing", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Produzione asset creativi per campagne", "description": "Creazione grafiche e video per advertising", "sub_items": ["Ideazione visual concept per campagne", "Creazione grafiche statiche per social ads", "Creazione video brevi per advertising", "Adattamento formati per diversi posizionamenti", "Revisioni e ottimizzazioni"], "price": 250.00, "price_type": "una_tantum", "category": "content", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Supporto recupero account Meta compromesso", "description": "Assistenza per recupero account social compromessi", "sub_items": ["Analisi situazione e livello di compromissione", "Procedura di recupero tramite canali ufficiali Meta", "Messa in sicurezza account recuperato", "Consulenza su best practice di sicurezza"], "price": 150.00, "price_type": "una_tantum", "category": "support", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Fotografia progetto", "description": "Servizio fotografico professionale", "sub_items": ["Pianificazione e briefing creativo", "Sessione fotografica on-location", "Post-produzione e ritocco immagini", "Consegna file alta risoluzione", "Cessione diritti d'uso per comunicazione"], "price": 800.00, "price_type": "una_tantum", "category": "content", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Video produzione", "description": "Produzione video professionale", "sub_items": ["Scrittura script e storyboard", "Riprese video professionali", "Montaggio e post-produzione", "Color grading e grafiche animate", "Consegna in formati ottimizzati per web e social"], "price": 1000.00, "price_type": "una_tantum", "category": "content", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Formazione marketing (6 ore)", "description": "Formazione pratica sulla gestione social e marketing", "sub_items": ["Formazione di 6 ore totali divise in 3 sessioni da 2h", "Panoramica dei canali Facebook e Instagram", "Differenze tra account personali, pagine e profili business", "Preparazione base nell'utilizzo della Meta Business Suite", "Studio degli strumenti di monitoraggio e programmazione", "Principi di visual design per social (post, storie, carosello, video)", "Scrittura base per caption e storytelling"], "price": 300.00, "price_type": "una_tantum", "category": "training", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Strategia di comunicazione", "description": "Definizione strategia comunicativa integrata", "sub_items": ["Analisi del contesto di mercato e competitor", "Definizione obiettivi di comunicazione", "Identificazione target audience e personas", "Definizione canali e touchpoint", "Piano strategico integrato online/offline", "KPI e metriche di misurazione"], "price": 1200.00, "price_type": "una_tantum", "category": "strategy", "is_active": True},
+        {"id": str(uuid.uuid4()), "name": "Progettazione grafica", "description": "Design materiale grafico coordinato", "sub_items": ["Materiale cartaceo informativo per territorio ed eventi", "Immagine coordinata di campagna e linee guida grafiche", "Template grafici per canali digitali", "Adattamento formati per stampa e web"], "price": 1900.00, "price_type": "una_tantum", "category": "branding", "is_active": True},
     ]
     await db.services.insert_many(services_data)
     

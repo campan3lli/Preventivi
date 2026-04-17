@@ -901,84 +901,148 @@ const NewQuotePage = () => {
     { value: 'ibrido', label: 'Ibrido', desc: 'Moduli + Step', icon: Shuffle }
   ];
 
+  const isStepBased = formData.quote_type === 'step' || formData.quote_type === 'ibrido';
+  const totalSteps = isStepBased ? 4 : 3;
+
   const toggleService = (service) => {
     const existing = formData.services.find(s => s.service_id === service.id);
     if (existing) {
-      setFormData(prev => ({
-        ...prev,
-        services: prev.services.filter(s => s.service_id !== service.id)
-      }));
+      setFormData(prev => ({ ...prev, services: prev.services.filter(s => s.service_id !== service.id) }));
     } else {
       setFormData(prev => ({
         ...prev,
         services: [...prev.services, {
-          service_id: service.id,
-          service_name: service.name,
-          description: service.description,
-          price: service.price,
-          price_type: service.price_type,
-          quantity: 1,
-          is_selected: true
+          service_id: service.id, service_name: service.name, description: service.description,
+          sub_items: service.sub_items || [], price: service.price, price_type: service.price_type,
+          quantity: 1, is_selected: true
         }]
       }));
     }
   };
 
+  const addStep = () => {
+    const newStep = {
+      step_number: formData.steps.length + 1,
+      title: '', description: '', duration: '', output: '', services: []
+    };
+    setFormData(prev => ({ ...prev, steps: [...prev.steps, newStep] }));
+  };
+
+  const updateStep = (idx, field, value) => {
+    setFormData(prev => {
+      const newSteps = [...prev.steps];
+      newSteps[idx] = { ...newSteps[idx], [field]: value };
+      return { ...prev, steps: newSteps };
+    });
+  };
+
+  const removeStep = (idx) => {
+    setFormData(prev => {
+      const newSteps = prev.steps.filter((_, i) => i !== idx).map((s, i) => ({ ...s, step_number: i + 1 }));
+      return { ...prev, steps: newSteps };
+    });
+  };
+
+  const toggleStepService = (stepIdx, service) => {
+    setFormData(prev => {
+      const newSteps = [...prev.steps];
+      const stepServices = newSteps[stepIdx].services;
+      const existing = stepServices.find(s => s.service_id === service.id);
+      if (existing) {
+        newSteps[stepIdx] = { ...newSteps[stepIdx], services: stepServices.filter(s => s.service_id !== service.id) };
+      } else {
+        newSteps[stepIdx] = {
+          ...newSteps[stepIdx],
+          services: [...stepServices, {
+            service_id: service.id, service_name: service.name, description: service.description,
+            sub_items: service.sub_items || [], price: service.price, price_type: service.price_type,
+            quantity: 1, is_selected: true
+          }]
+        };
+      }
+      return { ...prev, steps: newSteps };
+    });
+  };
+
   const calculateTotal = () => {
-    return formData.services.reduce((sum, s) => s.is_selected ? sum + (s.price * s.quantity) : sum, 0);
+    let total = formData.services.reduce((sum, s) => s.is_selected ? sum + (s.price * s.quantity) : sum, 0);
+    formData.steps.forEach(st => {
+      st.services.forEach(s => { if (s.is_selected) total += s.price * s.quantity; });
+    });
+    return total;
   };
 
   const handleSubmit = async () => {
-    if (!formData.client_id) {
-      toast.error('Seleziona un cliente');
-      return;
-    }
-    if (!formData.subject) {
-      toast.error('Inserisci l\'oggetto del preventivo');
-      return;
-    }
-    if (formData.services.length === 0) {
-      toast.error('Seleziona almeno un servizio');
-      return;
-    }
-
+    if (!formData.client_id) { toast.error('Seleziona un cliente'); return; }
+    if (!formData.subject) { toast.error('Inserisci l\'oggetto del preventivo'); return; }
+    const hasServices = formData.services.length > 0 || formData.steps.some(s => s.services.length > 0);
+    if (!hasServices) { toast.error('Seleziona almeno un servizio'); return; }
     setLoading(true);
     try {
       const res = await axios.post(`${API}/quotes`, formData);
       toast.success('Preventivo creato!');
       navigate(`/preventivi/${res.data.id}`);
-    } catch (err) {
-      toast.error('Errore nella creazione');
-    }
+    } catch (err) { toast.error('Errore nella creazione'); }
     setLoading(false);
   };
+
+  // Service selector component used in both standard and step modes
+  const ServiceSelector = ({ selectedServices, onToggle, compact = false }) => (
+    <ScrollArea className={compact ? "h-[300px] pr-4" : "h-[500px] pr-4"}>
+      <div className="service-list">
+        {services.map(service => {
+          const isSelected = selectedServices.some(s => s.service_id === service.id);
+          return (
+            <div key={service.id} className={`service-item ${isSelected ? 'selected' : ''}`}
+              onClick={() => onToggle(service)} data-testid={`select-service-${service.id}`}>
+              <div className="flex items-center gap-3">
+                <Checkbox checked={isSelected} className="pointer-events-none" />
+                <div className="service-info">
+                  <p className="service-name">{service.name}</p>
+                  <p className="service-desc">{service.description}</p>
+                  {service.sub_items && service.sub_items.length > 0 && (
+                    <div className="mt-1 space-y-0.5">
+                      {service.sub_items.slice(0, 3).map((item, i) => (
+                        <p key={i} className="text-xs text-gray-400 pl-2">- {item}</p>
+                      ))}
+                      {service.sub_items.length > 3 && (
+                        <p className="text-xs text-gray-400 pl-2 italic">...e altri {service.sub_items.length - 3}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <span className="service-price">{formatPrice(service.price, service.price_type)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </ScrollArea>
+  );
 
   return (
     <div className="animate-fadeIn" data-testid="new-quote-page">
       <div className="page-header">
         <h1 className="page-title">Nuovo Preventivo</h1>
-        <p className="page-subtitle">Step {step} di 3</p>
+        <p className="page-subtitle">Step {step} di {totalSteps}</p>
       </div>
 
       {/* Progress bar */}
       <div className="flex gap-2 mb-8">
-        {[1, 2, 3].map(s => (
+        {Array.from({ length: totalSteps }, (_, i) => i + 1).map(s => (
           <div key={s} className={`h-2 flex-1 rounded-full transition-colors ${s <= step ? 'bg-[#002fa7]' : 'bg-gray-200'}`} />
         ))}
       </div>
 
+      {/* Step 1: Base Info */}
       {step === 1 && (
         <Card className="animate-slideIn">
-          <CardHeader>
-            <CardTitle>Informazioni Base</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Informazioni Base</CardTitle></CardHeader>
           <CardContent className="space-y-6">
             <div>
               <label className="form-label">Cliente *</label>
               <Select value={formData.client_id} onValueChange={(v) => setFormData({...formData, client_id: v})}>
-                <SelectTrigger data-testid="select-client">
-                  <SelectValue placeholder="Seleziona cliente" />
-                </SelectTrigger>
+                <SelectTrigger data-testid="select-client"><SelectValue placeholder="Seleziona cliente" /></SelectTrigger>
                 <SelectContent>
                   {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}
                 </SelectContent>
@@ -994,7 +1058,7 @@ const NewQuotePage = () => {
               <div className="quote-type-grid mt-2">
                 {quoteTypes.map(type => (
                   <div key={type.value} className={`quote-type-item ${formData.quote_type === type.value ? 'selected' : ''}`}
-                    onClick={() => setFormData({...formData, quote_type: type.value})} data-testid={`quote-type-${type.value}`}>
+                    onClick={() => setFormData({...formData, quote_type: type.value, steps: [], services: []})} data-testid={`quote-type-${type.value}`}>
                     <div className="quote-type-icon"><type.icon size={24} /></div>
                     <p className="quote-type-name">{type.label}</p>
                     <p className="quote-type-desc">{type.desc}</p>
@@ -1011,40 +1075,108 @@ const NewQuotePage = () => {
         </Card>
       )}
 
-      {step === 2 && (
+      {/* Step 2: For step/ibrido - Define phases */}
+      {step === 2 && isStepBased && (
         <Card className="animate-slideIn">
           <CardHeader>
-            <CardTitle>Seleziona Servizi</CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle>Definisci le Fasi del Progetto</CardTitle>
+              <Button onClick={addStep} className="btn-primary gap-2" data-testid="add-step-btn">
+                <Plus size={18} /> Aggiungi Fase
+              </Button>
+            </div>
           </CardHeader>
+          <CardContent>
+            {formData.steps.length === 0 && (
+              <div className="empty-state py-10">
+                <div className="empty-state-icon"><Layers size={32} /></div>
+                <p className="empty-state-title">Nessuna fase definita</p>
+                <p className="empty-state-desc">Aggiungi le fasi del progetto con i relativi servizi</p>
+              </div>
+            )}
+            <div className="space-y-6">
+              {formData.steps.map((phaseStep, idx) => (
+                <Card key={idx} className="border-2 border-gray-200" data-testid={`step-card-${idx}`}>
+                  <CardContent className="p-5">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-[#002fa7] text-white rounded-lg flex items-center justify-center font-bold text-lg">
+                          {phaseStep.step_number}
+                        </div>
+                        <Input value={phaseStep.title} onChange={(e) => updateStep(idx, 'title', e.target.value)}
+                          placeholder="Titolo fase (es. Onboarding e set-up)" className="font-semibold text-lg border-0 focus:ring-0 p-0 h-auto"
+                          data-testid={`step-title-${idx}`} />
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => removeStep(idx)} className="text-red-600" data-testid={`remove-step-${idx}`}>
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="form-label">Durata</label>
+                        <Input value={phaseStep.duration} onChange={(e) => updateStep(idx, 'duration', e.target.value)}
+                          placeholder="Es. 5 giorni" data-testid={`step-duration-${idx}`} />
+                      </div>
+                      <div>
+                        <label className="form-label">Output</label>
+                        <Input value={phaseStep.output} onChange={(e) => updateStep(idx, 'output', e.target.value)}
+                          placeholder="Es. Brief approvato, Calendario" data-testid={`step-output-${idx}`} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="form-label">Descrizione</label>
+                      <Textarea value={phaseStep.description} onChange={(e) => updateStep(idx, 'description', e.target.value)}
+                        placeholder="Descrizione della fase..." rows={2} data-testid={`step-desc-${idx}`} />
+                    </div>
+                    <div className="mt-4">
+                      <label className="form-label">Servizi associati a questa fase</label>
+                      <ServiceSelector selectedServices={phaseStep.services} onToggle={(svc) => toggleStepService(idx, svc)} compact />
+                    </div>
+                    {phaseStep.services.length > 0 && (
+                      <div className="mt-3 pt-3 border-t">
+                        <div className="flex justify-between text-sm font-semibold">
+                          <span>Subtotale fase</span>
+                          <span className="text-[#002fa7]">
+                            {formatPrice(phaseStep.services.reduce((sum, s) => sum + s.price * s.quantity, 0), 'una_tantum')}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* For ibrido: also show standalone services */}
+            {formData.quote_type === 'ibrido' && (
+              <div className="mt-8">
+                <h3 className="text-lg font-semibold mb-4">Servizi Standalone (fuori dalle fasi)</h3>
+                <ServiceSelector selectedServices={formData.services} onToggle={toggleService} compact />
+              </div>
+            )}
+
+            <div className="flex justify-between mt-6">
+              <Button variant="outline" onClick={() => setStep(1)}>Indietro</Button>
+              <Button onClick={() => setStep(3)} className="btn-primary gap-2" data-testid="next-step-2">
+                Avanti <ChevronRight size={18} />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 2: For standard/moduli - Select services */}
+      {step === 2 && !isStepBased && (
+        <Card className="animate-slideIn">
+          <CardHeader><CardTitle>Seleziona Servizi</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                <ScrollArea className="h-[500px] pr-4">
-                  <div className="service-list">
-                    {services.map(service => {
-                      const isSelected = formData.services.some(s => s.service_id === service.id);
-                      return (
-                        <div key={service.id} className={`service-item ${isSelected ? 'selected' : ''}`}
-                          onClick={() => toggleService(service)} data-testid={`select-service-${service.id}`}>
-                          <div className="flex items-center gap-3">
-                            <Checkbox checked={isSelected} className="pointer-events-none" />
-                            <div className="service-info">
-                              <p className="service-name">{service.name}</p>
-                              <p className="service-desc">{service.description}</p>
-                            </div>
-                          </div>
-                          <span className="service-price">{formatPrice(service.price, service.price_type)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </ScrollArea>
+                <ServiceSelector selectedServices={formData.services} onToggle={toggleService} />
               </div>
               <div>
                 <Card className="bg-gray-50 sticky top-4">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Riepilogo</CardTitle>
-                  </CardHeader>
+                  <CardHeader><CardTitle className="text-lg">Riepilogo</CardTitle></CardHeader>
                   <CardContent>
                     <div className="space-y-2 mb-4">
                       {formData.services.map(s => (
@@ -1054,15 +1186,14 @@ const NewQuotePage = () => {
                         </div>
                       ))}
                     </div>
-                    {formData.services.length > 0 && (
+                    {formData.services.length > 0 ? (
                       <div className="pt-4 border-t">
                         <div className="flex justify-between items-center">
                           <span className="font-semibold">Totale</span>
                           <span className="text-xl font-bold text-[#002fa7]">{formatPrice(calculateTotal(), 'una_tantum')}</span>
                         </div>
                       </div>
-                    )}
-                    {formData.services.length === 0 && (
+                    ) : (
                       <p className="text-sm text-gray-500 text-center py-4">Nessun servizio selezionato</p>
                     )}
                   </CardContent>
@@ -1079,11 +1210,10 @@ const NewQuotePage = () => {
         </Card>
       )}
 
-      {step === 3 && (
+      {/* Step 3 (or 4 for step-based): Details */}
+      {((step === 3 && !isStepBased) || (step === 3 && isStepBased)) && (
         <Card className="animate-slideIn">
-          <CardHeader>
-            <CardTitle>Dettagli Aggiuntivi</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Dettagli Aggiuntivi</CardTitle></CardHeader>
           <CardContent className="space-y-6">
             <div>
               <label className="form-label">Premessa</label>
@@ -1098,7 +1228,7 @@ const NewQuotePage = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="form-label">Validità (giorni)</label>
-                <Input type="number" value={formData.validity_days} onChange={(e) => setFormData({...formData, validity_days: parseInt(e.target.value)})} />
+                <Input type="number" value={formData.validity_days} onChange={(e) => setFormData({...formData, validity_days: parseInt(e.target.value) || 30})} />
               </div>
               <div>
                 <label className="form-label">Tempi di consegna</label>
@@ -1115,12 +1245,23 @@ const NewQuotePage = () => {
               <Textarea value={formData.extra_notes} onChange={(e) => setFormData({...formData, extra_notes: e.target.value})} rows={2} />
             </div>
 
+            {/* Summary card */}
             <Card className="bg-[#002fa7] text-white">
               <CardContent className="p-6">
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="text-sm opacity-80">Totale Preventivo</p>
                     <p className="text-3xl font-bold">{formatPrice(calculateTotal(), 'una_tantum')}</p>
+                    {isStepBased && formData.steps.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {formData.steps.map((s, i) => (
+                          <p key={i} className="text-sm opacity-70">Fase {s.step_number}: {s.title || 'Senza titolo'} — {formatPrice(s.services.reduce((sum, sv) => sum + sv.price * sv.quantity, 0), 'una_tantum')}</p>
+                        ))}
+                        {formData.services.length > 0 && (
+                          <p className="text-sm opacity-70">Servizi standalone — {formatPrice(formData.services.reduce((sum, s) => sum + s.price * s.quantity, 0), 'una_tantum')}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <CheckCircle2 size={48} className="opacity-50" />
                 </div>
@@ -1252,20 +1393,66 @@ const QuoteDetailPage = () => {
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Servizi</CardTitle>
+              <CardTitle>{(quote.quote_type === 'step' || quote.quote_type === 'ibrido') && quote.steps?.length > 0 ? 'Fasi e Servizi' : 'Servizi'}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {quote.services.map((service, idx) => (
-                  <div key={idx} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-semibold">{service.service_name}</p>
-                      {service.description && <p className="text-sm text-gray-500">{service.description}</p>}
+              {/* Show steps if present */}
+              {(quote.quote_type === 'step' || quote.quote_type === 'ibrido') && quote.steps?.length > 0 && (
+                <div className="space-y-6 mb-6">
+                  {quote.steps.map((phaseStep, idx) => (
+                    <div key={idx} className="border-l-4 border-[#002fa7] pl-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="inline-flex items-center justify-center w-7 h-7 bg-[#002fa7] text-white rounded-full text-sm font-bold">{phaseStep.step_number}</span>
+                        <h4 className="font-bold text-lg text-[#1a281f]">{phaseStep.title}</h4>
+                      </div>
+                      {phaseStep.duration && <p className="text-sm text-gray-500 italic mb-1">Richiede {phaseStep.duration}</p>}
+                      {phaseStep.description && <p className="text-gray-600 mb-2">{phaseStep.description}</p>}
+                      {phaseStep.output && <p className="text-sm mb-3"><span className="font-semibold">Output:</span> {phaseStep.output}</p>}
+                      <div className="space-y-2">
+                        {phaseStep.services?.map((service, sIdx) => (
+                          <div key={sIdx} className="flex justify-between items-start p-3 bg-gray-50 rounded-lg">
+                            <div className="flex-1">
+                              <p className="font-semibold">{service.service_name}</p>
+                              {service.sub_items && service.sub_items.length > 0 && (
+                                <div className="mt-1 space-y-0.5">
+                                  {service.sub_items.map((item, i) => (
+                                    <p key={i} className="text-xs text-gray-500 pl-2">- {item}</p>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <span className="font-bold text-[#002fa7] ml-4 whitespace-nowrap">{formatPrice(service.price, service.price_type)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <span className="font-bold text-[#002fa7]">{formatPrice(service.price, service.price_type)}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
+              {/* Show standalone services */}
+              {quote.services?.length > 0 && (
+                <div className="space-y-3">
+                  {(quote.quote_type === 'ibrido' && quote.steps?.length > 0) && (
+                    <h4 className="font-semibold text-gray-500 text-sm uppercase tracking-wide mb-2">Servizi Standalone</h4>
+                  )}
+                  {quote.services.map((service, idx) => (
+                    <div key={idx} className="flex justify-between items-start p-4 bg-gray-50 rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-semibold">{service.service_name}</p>
+                        {service.description && <p className="text-sm text-gray-500">{service.description}</p>}
+                        {service.sub_items && service.sub_items.length > 0 && (
+                          <div className="mt-1 space-y-0.5">
+                            {service.sub_items.map((item, i) => (
+                              <p key={i} className="text-xs text-gray-500 pl-2">- {item}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <span className="font-bold text-[#002fa7] ml-4 whitespace-nowrap">{formatPrice(service.price, service.price_type)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="mt-6 pt-4 border-t flex justify-between items-center">
                 <span className="text-lg font-semibold">Totale</span>
                 <span className="text-2xl font-bold text-[#002fa7]">{formatPrice(quote.total_amount, 'una_tantum')}</span>
