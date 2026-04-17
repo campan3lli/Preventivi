@@ -138,54 +138,54 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card className="stats-card card-hover" data-testid="stat-quotes">
           <CardContent className="p-6">
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-center">
               <div>
                 <p className="stats-card-title">Preventivi</p>
                 <p className="stats-card-value">{stats.quotes}</p>
               </div>
-              <div className="stats-card-icon bg-[#002fa7] text-white">
-                <FileText size={24} />
+              <div className="w-12 h-12 min-w-[3rem] rounded-xl bg-[#002fa7] text-white flex items-center justify-center">
+                <FileText size={22} />
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="stats-card card-hover" data-testid="stat-clients">
           <CardContent className="p-6">
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-center">
               <div>
                 <p className="stats-card-title">Clienti</p>
                 <p className="stats-card-value">{stats.clients}</p>
               </div>
-              <div className="stats-card-icon bg-[#dbf637] text-[#1a281f]">
-                <Users size={24} />
+              <div className="w-12 h-12 min-w-[3rem] rounded-xl bg-[#dbf637] text-[#1a281f] flex items-center justify-center">
+                <Users size={22} />
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="stats-card card-hover" data-testid="stat-services">
           <CardContent className="p-6">
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-center">
               <div>
                 <p className="stats-card-title">Servizi</p>
                 <p className="stats-card-value">{stats.services}</p>
               </div>
-              <div className="stats-card-icon bg-[#1a281f] text-white">
-                <Package size={24} />
+              <div className="w-12 h-12 min-w-[3rem] rounded-xl bg-[#1a281f] text-white flex items-center justify-center">
+                <Package size={22} />
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="stats-card card-hover" data-testid="stat-total">
           <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
+            <div className="flex justify-between items-center">
+              <div className="min-w-0">
                 <p className="stats-card-title">Totale Preventivi</p>
-                <p className="stats-card-value text-[#002fa7]">
+                <p className="stats-card-value text-[#002fa7] truncate text-2xl">
                   {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(stats.total)}
                 </p>
               </div>
-              <div className="stats-card-icon bg-[#002fa7] text-white">
-                <Receipt size={24} />
+              <div className="w-12 h-12 min-w-[3rem] rounded-xl bg-[#002fa7] text-white flex items-center justify-center">
+                <Receipt size={22} />
               </div>
             </div>
           </CardContent>
@@ -202,18 +202,18 @@ const Dashboard = () => {
               {recentQuotes.map((quote) => (
                 <div key={quote.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
                   onClick={() => navigate(`/preventivi/${quote.id}`)} data-testid={`quote-item-${quote.id}`}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#002fa7] text-white rounded-lg flex items-center justify-center font-bold">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-10 h-10 min-w-[2.5rem] bg-[#002fa7] text-white rounded-lg flex items-center justify-center font-bold text-sm shrink-0">
                       #{quote.quote_number}
                     </div>
-                    <div>
-                      <p className="font-semibold text-[#1a281f]">{quote.client_name}</p>
-                      <p className="text-sm text-gray-500">{quote.subject}</p>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[#1a281f] truncate">{quote.client_name}</p>
+                      <p className="text-sm text-gray-500 truncate">{quote.subject}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 shrink-0 ml-4">
                     <StatusBadge status={quote.status} />
-                    <span className="font-bold text-[#002fa7]">{formatPrice(quote.total_amount, 'una_tantum')}</span>
+                    <span className="font-bold text-[#002fa7] whitespace-nowrap">{formatPrice(quote.total_amount, 'una_tantum')}</span>
                     <ChevronRight size={20} className="text-gray-400" />
                   </div>
                 </div>
@@ -498,17 +498,17 @@ const ServicesPage = () => {
             <div className="service-list">
               {filteredServices.map((service) => (
                 <div key={service.id} className="service-item" data-testid={`service-item-${service.id}`}>
-                  <div className="service-info">
-                    <div className="flex items-center gap-2">
+                  <div className="service-info min-w-0 flex-1 mr-4">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="service-name">{service.name}</span>
-                      <Badge variant="outline" className="text-xs">{service.category}</Badge>
-                      {!service.is_active && <Badge variant="secondary" className="text-xs">Disattivato</Badge>}
+                      <Badge variant="outline" className="text-xs shrink-0">{service.category}</Badge>
+                      {!service.is_active && <Badge variant="secondary" className="text-xs shrink-0">Disattivato</Badge>}
                     </div>
-                    <p className="service-desc">{service.description}</p>
+                    <p className="service-desc truncate">{service.description}</p>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="service-price">{formatPrice(service.price, service.price_type)}</span>
-                    <div className="flex gap-1">
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="service-price whitespace-nowrap">{formatPrice(service.price, service.price_type)}</span>
+                    <div className="flex gap-0.5">
                       <Button variant="ghost" size="sm" onClick={() => openEdit(service)} data-testid={`edit-service-${service.id}`}>
                         <Edit size={16} />
                       </Button>
@@ -1498,18 +1498,16 @@ const QuoteDetailPage = () => {
 
   return (
     <div className="animate-fadeIn" data-testid="quote-detail-page">
-      <div className="page-header flex justify-between items-center">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <Button variant="ghost" onClick={() => navigate('/preventivi')} className="p-2">
-              <ChevronRight size={20} className="rotate-180" />
-            </Button>
-            <h1 className="page-title">Preventivo #{quote.quote_number}</h1>
-            <StatusBadge status={quote.status} />
-          </div>
-          <p className="page-subtitle">{quote.subject}</p>
+      <div className="page-header">
+        <div className="flex items-center gap-3 mb-2">
+          <Button variant="ghost" onClick={() => navigate('/preventivi')} className="p-2 shrink-0">
+            <ChevronRight size={20} className="rotate-180" />
+          </Button>
+          <h1 className="page-title">Preventivo #{quote.quote_number}</h1>
+          <StatusBadge status={quote.status} />
         </div>
-        <div className="flex gap-2">
+        <p className="page-subtitle ml-11">{quote.subject}</p>
+        <div className="flex flex-wrap items-center gap-2 mt-4">
           <Select value={quote.status} onValueChange={updateStatus}>
             <SelectTrigger className="w-36" data-testid="status-select">
               <SelectValue />
@@ -1521,17 +1519,17 @@ const QuoteDetailPage = () => {
               <SelectItem value="rejected">Rifiutato</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={handleDownload} className="gap-2" data-testid="download-pdf-btn">
-            <Download size={18} /> Scarica PDF
+          <Button variant="outline" size="sm" onClick={handleDownload} className="gap-1.5" data-testid="download-pdf-btn">
+            <Download size={16} /> Scarica PDF
           </Button>
-          <Button variant="outline" onClick={() => navigate(`/preventivi/${id}/modifica`)} className="gap-2" data-testid="edit-quote-btn">
-            <Edit size={18} /> Modifica
+          <Button variant="outline" size="sm" onClick={() => navigate(`/preventivi/${id}/modifica`)} className="gap-1.5" data-testid="edit-quote-btn">
+            <Edit size={16} /> Modifica
           </Button>
-          <Button variant="outline" onClick={handleDuplicate} className="gap-2" data-testid="duplicate-quote-btn">
-            <Copy size={18} /> Duplica
+          <Button variant="outline" size="sm" onClick={handleDuplicate} className="gap-1.5" data-testid="duplicate-quote-btn">
+            <Copy size={16} /> Duplica
           </Button>
-          <Button variant="outline" onClick={handleSaveAsTemplate} className="gap-2" data-testid="save-template-btn">
-            <Bookmark size={18} /> Salva come Template
+          <Button variant="outline" size="sm" onClick={handleSaveAsTemplate} className="gap-1.5" data-testid="save-template-btn">
+            <Bookmark size={16} /> Salva Template
           </Button>
         </div>
       </div>
@@ -1548,8 +1546,8 @@ const QuoteDetailPage = () => {
                 <div className="space-y-6 mb-6">
                   {quote.steps.map((phaseStep, idx) => (
                     <div key={idx} className="border-l-4 border-[#002fa7] pl-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="inline-flex items-center justify-center w-7 h-7 bg-[#002fa7] text-white rounded-full text-sm font-bold">{phaseStep.step_number}</span>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="inline-flex items-center justify-center w-8 h-8 min-w-[2rem] bg-[#002fa7] text-white rounded-full text-sm font-bold shrink-0">{phaseStep.step_number}</span>
                         <h4 className="font-bold text-lg text-[#1a281f]">{phaseStep.title}</h4>
                       </div>
                       {phaseStep.duration && <p className="text-sm text-gray-500 italic mb-1">Richiede {phaseStep.duration}</p>}
