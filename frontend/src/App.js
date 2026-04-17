@@ -1019,7 +1019,7 @@ const QuotePreview = ({ formData, clients, suppliers, calculateTotal, onFormChan
       <div className="bg-[#002fa7] shadow-lg rounded-lg overflow-hidden relative" style={{ minHeight: '480px' }}>
         {/* Logo top-left - bigger */}
         <div className="absolute top-8 left-8">
-          <img src="https://customer-assets.emergentagent.com/job_quote-builder-217/artifacts/sliapkzx_3.png" alt="Limone Blu Studio" className="w-24 h-auto" />
+          <img src="https://customer-assets.emergentagent.com/job_quote-builder-217/artifacts/sliapkzx_3.png" alt="Limone Blu Studio" className="w-72 h-auto" />
         </div>
 
         {/* Content lower-left */}
