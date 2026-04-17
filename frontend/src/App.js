@@ -871,6 +871,101 @@ const QuotesPage = () => {
   );
 };
 
+// Service selector - defined outside NewQuotePage to avoid re-mount on state changes
+const ServiceSelector = ({ services, selectedServices, onToggle, compact = false }) => (
+  <div className={`${compact ? "max-h-[300px]" : "max-h-[500px]"} overflow-y-auto pr-2`}>
+    <div className="service-list">
+      {services.map(service => {
+        const isSelected = selectedServices.some(s => s.service_id === service.id);
+        return (
+          <div key={service.id} className={`service-item ${isSelected ? 'selected' : ''}`}
+            onClick={() => onToggle(service)} data-testid={`select-service-${service.id}`}>
+            <div className="flex items-center gap-3">
+              <Checkbox checked={isSelected} className="pointer-events-none" />
+              <div className="service-info">
+                <p className="service-name">{service.name}</p>
+                <p className="service-desc">{service.description}</p>
+                {service.sub_items && service.sub_items.length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    {service.sub_items.slice(0, 3).map((item, i) => (
+                      <p key={i} className="text-xs text-gray-400 pl-2">- {item}</p>
+                    ))}
+                    {service.sub_items.length > 3 && (
+                      <p className="text-xs text-gray-400 pl-2 italic">...e altri {service.sub_items.length - 3}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <span className="service-price">{formatPrice(service.price, service.price_type)}</span>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+
+// Sortable step card - defined outside NewQuotePage to avoid re-mount on drag
+const SortableStepCard = ({ id, idx, phaseStep, services, updateStep, removeStep, toggleStepService }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 50 : 'auto' };
+  return (
+    <div ref={setNodeRef} style={style} data-testid={`step-card-${idx}`}>
+      <Card className={`border-2 ${isDragging ? 'border-[#002fa7] shadow-lg' : 'border-gray-200'}`}>
+        <CardContent className="p-5">
+          <div className="flex justify-between items-start mb-4">
+            <div className="flex items-center gap-3">
+              <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-100 touch-none" data-testid={`drag-handle-${idx}`}>
+                <GripVertical size={20} className="text-gray-400" />
+              </div>
+              <div className="w-10 h-10 min-w-[2.5rem] bg-[#002fa7] text-white rounded-lg flex items-center justify-center font-bold text-lg shrink-0">
+                {phaseStep.step_number}
+              </div>
+              <Input value={phaseStep.title} onChange={(e) => updateStep(idx, 'title', e.target.value)}
+                placeholder="Titolo fase (es. Onboarding e set-up)" className="font-semibold text-lg border-0 focus:ring-0 p-0 h-auto"
+                data-testid={`step-title-${idx}`} />
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => removeStep(idx)} className="text-red-600 shrink-0" data-testid={`remove-step-${idx}`}>
+              <Trash2 size={16} />
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="form-label">Durata</label>
+              <Input value={phaseStep.duration} onChange={(e) => updateStep(idx, 'duration', e.target.value)}
+                placeholder="Es. 5 giorni" data-testid={`step-duration-${idx}`} />
+            </div>
+            <div>
+              <label className="form-label">Output</label>
+              <Input value={phaseStep.output} onChange={(e) => updateStep(idx, 'output', e.target.value)}
+                placeholder="Es. Brief approvato, Calendario" data-testid={`step-output-${idx}`} />
+            </div>
+          </div>
+          <div>
+            <label className="form-label">Descrizione</label>
+            <Textarea value={phaseStep.description} onChange={(e) => updateStep(idx, 'description', e.target.value)}
+              placeholder="Descrizione della fase..." rows={2} data-testid={`step-desc-${idx}`} />
+          </div>
+          <div className="mt-4">
+            <label className="form-label">Servizi associati a questa fase</label>
+            <ServiceSelector services={services} selectedServices={phaseStep.services} onToggle={(svc) => toggleStepService(idx, svc)} compact />
+          </div>
+          {phaseStep.services.length > 0 && (
+            <div className="mt-3 pt-3 border-t">
+              <div className="flex justify-between text-sm font-semibold">
+                <span>Subtotale fase</span>
+                <span className="text-[#002fa7]">
+                  {formatPrice(phaseStep.services.reduce((sum, s) => sum + s.price * s.quantity, 0), 'una_tantum')}
+                </span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 // New/Edit Quote page
 const NewQuotePage = () => {
   const navigate = useNavigate();
@@ -1050,40 +1145,6 @@ const NewQuotePage = () => {
     setLoading(false);
   };
 
-  // Service selector component used in both standard and step modes
-  const ServiceSelector = ({ selectedServices, onToggle, compact = false }) => (
-    <ScrollArea className={compact ? "h-[300px] pr-4" : "h-[500px] pr-4"}>
-      <div className="service-list">
-        {services.map(service => {
-          const isSelected = selectedServices.some(s => s.service_id === service.id);
-          return (
-            <div key={service.id} className={`service-item ${isSelected ? 'selected' : ''}`}
-              onClick={() => onToggle(service)} data-testid={`select-service-${service.id}`}>
-              <div className="flex items-center gap-3">
-                <Checkbox checked={isSelected} className="pointer-events-none" />
-                <div className="service-info">
-                  <p className="service-name">{service.name}</p>
-                  <p className="service-desc">{service.description}</p>
-                  {service.sub_items && service.sub_items.length > 0 && (
-                    <div className="mt-1 space-y-0.5">
-                      {service.sub_items.slice(0, 3).map((item, i) => (
-                        <p key={i} className="text-xs text-gray-400 pl-2">- {item}</p>
-                      ))}
-                      {service.sub_items.length > 3 && (
-                        <p className="text-xs text-gray-400 pl-2 italic">...e altri {service.sub_items.length - 3}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <span className="service-price">{formatPrice(service.price, service.price_type)}</span>
-            </div>
-          );
-        })}
-      </div>
-    </ScrollArea>
-  );
-
   // Drag and drop for steps
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -1098,67 +1159,6 @@ const NewQuotePage = () => {
       const reordered = arrayMove(prev.steps, oldIndex, newIndex).map((s, i) => ({ ...s, step_number: i + 1 }));
       return { ...prev, steps: reordered };
     });
-  };
-
-  // Sortable step card component
-  const SortableStepCard = ({ id, idx, phaseStep }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-    const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 50 : 'auto' };
-    return (
-      <div ref={setNodeRef} style={style} data-testid={`step-card-${idx}`}>
-        <Card className={`border-2 ${isDragging ? 'border-[#002fa7] shadow-lg' : 'border-gray-200'}`}>
-          <CardContent className="p-5">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center gap-3">
-                <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-100 touch-none" data-testid={`drag-handle-${idx}`}>
-                  <GripVertical size={20} className="text-gray-400" />
-                </div>
-                <div className="w-10 h-10 bg-[#002fa7] text-white rounded-lg flex items-center justify-center font-bold text-lg">
-                  {phaseStep.step_number}
-                </div>
-                <Input value={phaseStep.title} onChange={(e) => updateStep(idx, 'title', e.target.value)}
-                  placeholder="Titolo fase (es. Onboarding e set-up)" className="font-semibold text-lg border-0 focus:ring-0 p-0 h-auto"
-                  data-testid={`step-title-${idx}`} />
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => removeStep(idx)} className="text-red-600" data-testid={`remove-step-${idx}`}>
-                <Trash2 size={16} />
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="form-label">Durata</label>
-                <Input value={phaseStep.duration} onChange={(e) => updateStep(idx, 'duration', e.target.value)}
-                  placeholder="Es. 5 giorni" data-testid={`step-duration-${idx}`} />
-              </div>
-              <div>
-                <label className="form-label">Output</label>
-                <Input value={phaseStep.output} onChange={(e) => updateStep(idx, 'output', e.target.value)}
-                  placeholder="Es. Brief approvato, Calendario" data-testid={`step-output-${idx}`} />
-              </div>
-            </div>
-            <div>
-              <label className="form-label">Descrizione</label>
-              <Textarea value={phaseStep.description} onChange={(e) => updateStep(idx, 'description', e.target.value)}
-                placeholder="Descrizione della fase..." rows={2} data-testid={`step-desc-${idx}`} />
-            </div>
-            <div className="mt-4">
-              <label className="form-label">Servizi associati a questa fase</label>
-              <ServiceSelector selectedServices={phaseStep.services} onToggle={(svc) => toggleStepService(idx, svc)} compact />
-            </div>
-            {phaseStep.services.length > 0 && (
-              <div className="mt-3 pt-3 border-t">
-                <div className="flex justify-between text-sm font-semibold">
-                  <span>Subtotale fase</span>
-                  <span className="text-[#002fa7]">
-                    {formatPrice(phaseStep.services.reduce((sum, s) => sum + s.price * s.quantity, 0), 'una_tantum')}
-                  </span>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
   };
 
   return (
@@ -1265,7 +1265,8 @@ const NewQuotePage = () => {
               <SortableContext items={formData.steps.map((_, i) => `step-${i}`)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-6">
                   {formData.steps.map((phaseStep, idx) => (
-                    <SortableStepCard key={`step-${idx}`} id={`step-${idx}`} idx={idx} phaseStep={phaseStep} />
+                    <SortableStepCard key={`step-${idx}`} id={`step-${idx}`} idx={idx} phaseStep={phaseStep}
+                      services={services} updateStep={updateStep} removeStep={removeStep} toggleStepService={toggleStepService} />
                   ))}
                 </div>
               </SortableContext>
@@ -1275,7 +1276,7 @@ const NewQuotePage = () => {
             {formData.quote_type === 'ibrido' && (
               <div className="mt-8">
                 <h3 className="text-lg font-semibold mb-4">Servizi Standalone (fuori dalle fasi)</h3>
-                <ServiceSelector selectedServices={formData.services} onToggle={toggleService} compact />
+                <ServiceSelector services={services} selectedServices={formData.services} onToggle={toggleService} compact />
               </div>
             )}
 
@@ -1296,7 +1297,7 @@ const NewQuotePage = () => {
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                <ServiceSelector selectedServices={formData.services} onToggle={toggleService} />
+                <ServiceSelector services={services} selectedServices={formData.services} onToggle={toggleService} />
               </div>
               <div>
                 <Card className="bg-gray-50 sticky top-4">
