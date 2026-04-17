@@ -967,7 +967,7 @@ const SortableStepCard = ({ id, idx, phaseStep, services, updateStep, removeStep
 };
 
 // Quote PDF-style preview component
-const QuotePreview = ({ formData, clients, suppliers, calculateTotal }) => {
+const QuotePreview = ({ formData, clients, suppliers, calculateTotal, onFormChange }) => {
   const client = clients.find(c => c.id === formData.client_id);
   const selectedSuppliers = suppliers.filter(s => formData.supplier_ids?.includes(s.id) || s.is_main);
   const isStepBased = formData.quote_type === 'step' || formData.quote_type === 'ibrido';
@@ -978,52 +978,85 @@ const QuotePreview = ({ formData, clients, suppliers, calculateTotal }) => {
   (formData.steps || []).forEach(st => { allServices.push(...(st.services || [])); });
   const total = calculateTotal();
 
+  // Editable text wrapper
+  const E = ({ children, className = '', tag = 'span', ...props }) => {
+    const Tag = tag;
+    return <Tag contentEditable suppressContentEditableWarning className={`outline-none focus:bg-blue-50 focus:ring-1 focus:ring-[#002fa7]/30 rounded px-0.5 ${className}`} {...props}>{children}</Tag>;
+  };
+
   // Page wrapper
-  const Page = ({ children, className = '' }) => (
-    <div className={`bg-white shadow-md rounded-lg mb-4 ${className}`} style={{ padding: '32px 36px', position: 'relative' }}>
+  const Page = ({ children }) => (
+    <div className="bg-white shadow-md rounded-lg mb-4" style={{ padding: '32px 36px' }}>
       {children}
     </div>
   );
 
+  // Page header
+  const PageHeader = () => (
+    <div className="flex justify-between items-start mb-6 pb-3 border-b-2 border-[#002fa7]">
+      <div>
+        <p className="text-[#002fa7] font-extrabold text-sm tracking-wide">LIMONE BLU STUDIO</p>
+        <p className="text-gray-400 text-[10px] mt-0.5">Preventivo | Data: {dateStr}</p>
+      </div>
+      <p className="text-gray-500 text-xs">Og. <E className="font-semibold text-gray-700">{formData.subject || '—'}</E></p>
+    </div>
+  );
+
+  // Page footer
+  const PageFooter = ({ num, tot }) => (
+    <div className="mt-6 pt-3 border-t border-gray-100 flex justify-between items-end">
+      <p className="text-[10px] text-gray-300">{num}/{tot}</p>
+      <p className="text-[10px] text-gray-300 italic">enjoy the juice.</p>
+    </div>
+  );
+
+  const totalPages = isStepBased ? 4 : 3;
+
   return (
     <div data-testid="quote-preview" className="space-y-4">
 
-      {/* PAGE 1: COVER */}
-      <div className="bg-[#002fa7] shadow-lg rounded-lg flex flex-col justify-between" style={{ padding: '40px', minHeight: '400px' }}>
-        <div>
-          <img src="https://customer-assets.emergentagent.com/job_quote-builder-217/artifacts/sliapkzx_3.png" alt="Logo" className="h-14 mb-8" />
-          <p className="text-white/50 text-xs tracking-[0.3em] uppercase mt-4">Limone Blu Studio</p>
+      {/* ========== COPERTINA ========== */}
+      <div className="bg-[#002fa7] shadow-lg rounded-lg overflow-hidden relative" style={{ minHeight: '480px' }}>
+        {/* Logo top-left */}
+        <div className="absolute top-8 left-8">
+          <img src="https://customer-assets.emergentagent.com/job_quote-builder-217/artifacts/sliapkzx_3.png" alt="Limone Blu Studio" style={{ height: '52px' }} />
         </div>
-        <div>
-          <h1 className="text-white text-5xl font-extrabold tracking-tight mb-4">PREVENTIVO</h1>
-          <p className="text-white/80 text-xl mb-8">---/{year}</p>
+
+        {/* LIMONE BLU STUDIO - large vertical text on right */}
+        <div className="absolute right-6 top-0 bottom-0 flex flex-col justify-center items-end pointer-events-none select-none" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+          <span className="text-white/10 font-extrabold tracking-widest" style={{ fontSize: '72px', letterSpacing: '12px' }}>LIMONE BLU STUDIO</span>
         </div>
-        <p className="text-[#dbf637] text-xs leading-relaxed max-w-sm">
-          Questo documento è un preventivo collettivo basato sui costi di freelancer operanti all'interno dello studio.
-        </p>
+
+        {/* Content lower-left */}
+        <div className="absolute bottom-0 left-0 right-0 p-8" style={{ paddingTop: '0' }}>
+          {/* Number in circle */}
+          <div className="w-16 h-16 rounded-full border-2 border-white/60 flex flex-col items-center justify-center mb-6">
+            <span className="text-white font-bold text-lg leading-none">---</span>
+            <span className="text-white/70 text-[10px] leading-none mt-0.5">{year}</span>
+          </div>
+
+          {/* PREVENTIVO */}
+          <h1 className="text-white font-extrabold mb-5" style={{ fontSize: '42px', letterSpacing: '-0.5px', lineHeight: 1 }}>PREVENTIVO</h1>
+
+          {/* Description */}
+          <E tag="p" className="text-[#dbf637] text-xs leading-relaxed max-w-md">
+            Questo documento è un preventivo collettivo basato sui costi di freelancer operanti all'interno dello studio.
+          </E>
+        </div>
       </div>
 
-      {/* PAGE 2: HEADER + SUPPLIER/CLIENT + PREMISE + METHODOLOGY */}
+      {/* ========== PAGINA 2: INFO + PREMESSA ========== */}
       <Page>
-        {/* Header bar */}
-        <div className="flex justify-between items-start mb-6 pb-4 border-b-2 border-[#002fa7]">
-          <div>
-            <p className="text-[#002fa7] font-extrabold text-base tracking-wide">LIMONE BLU STUDIO</p>
-            <p className="text-gray-400 text-[10px] mt-0.5">Preventivo | Data: {dateStr}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-gray-600 text-xs">Og. <span className="font-semibold">{formData.subject || '—'}</span></p>
-          </div>
-        </div>
+        <PageHeader />
 
         {/* Fornitore / Cliente */}
-        <div className="grid grid-cols-2 gap-10 mb-8">
+        <div className="grid grid-cols-2 gap-10 mb-6">
           <div>
-            <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-3">Fornitore</p>
+            <p className="text-[#002fa7] font-bold text-[10px] uppercase tracking-widest mb-2">Fornitore</p>
             {selectedSuppliers.map((s, i) => (
-              <div key={i} className="mb-3">
-                <p className="font-semibold text-xs text-gray-800">{s.legal_name || s.name}</p>
-                {s.address && <p className="text-[10px] text-gray-500">{s.address}</p>}
+              <div key={i} className="mb-2.5">
+                <E tag="p" className="font-semibold text-xs text-gray-800">{s.legal_name || s.name}</E>
+                {s.address && <E tag="p" className="text-[10px] text-gray-500">{s.address}</E>}
                 {s.vat_number && <p className="text-[10px] text-gray-500">P.IVA {s.vat_number}</p>}
                 {s.phone && <p className="text-[10px] text-gray-500">{s.phone}</p>}
                 {s.email && <p className="text-[10px] text-gray-500">{s.email}</p>}
@@ -1031,11 +1064,11 @@ const QuotePreview = ({ formData, clients, suppliers, calculateTotal }) => {
             ))}
           </div>
           <div>
-            <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-3">Cliente</p>
+            <p className="text-[#002fa7] font-bold text-[10px] uppercase tracking-widest mb-2">Cliente</p>
             {client ? (
               <div>
-                <p className="font-semibold text-xs text-gray-800">{client.company_name}</p>
-                <p className="text-[10px] text-gray-500">{client.address}</p>
+                <E tag="p" className="font-semibold text-xs text-gray-800">{client.company_name}</E>
+                <E tag="p" className="text-[10px] text-gray-500">{client.address}</E>
                 <p className="text-[10px] text-gray-500">P.IVA {client.vat_number}</p>
                 {client.phone && <p className="text-[10px] text-gray-500">{client.phone}</p>}
                 <p className="text-[10px] text-gray-500">{client.email}</p>
@@ -1045,65 +1078,53 @@ const QuotePreview = ({ formData, clients, suppliers, calculateTotal }) => {
         </div>
 
         {/* Premessa */}
-        {formData.premise && (
-          <div className="mb-6">
-            <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-2">Premessa</p>
-            <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{formData.premise}</p>
-          </div>
-        )}
+        <div className="mb-5">
+          <p className="text-[#002fa7] font-bold text-[10px] uppercase tracking-widest mb-1.5">Premessa</p>
+          <E tag="p" className="text-xs text-gray-600 leading-relaxed">{formData.premise || 'Inserisci la premessa...'}</E>
+        </div>
 
         {/* Metodologia */}
-        {formData.methodology && (
-          <div className="mb-6">
-            <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-2">Metodologia e approccio al lavoro</p>
-            <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{formData.methodology}</p>
-          </div>
-        )}
+        <div className="mb-5">
+          <p className="text-[#002fa7] font-bold text-[10px] uppercase tracking-widest mb-1.5">Metodologia e approccio al lavoro</p>
+          <E tag="p" className="text-xs text-gray-600 leading-relaxed">{formData.methodology || 'Inserisci la metodologia...'}</E>
+        </div>
 
-        {/* Steps/Phases (if step-based) */}
+        {/* Steps */}
         {isStepBased && formData.steps.length > 0 && (
           <div className="mb-4">
-            <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-3">Il progetto / Roadmap</p>
-            <div className="space-y-4">
+            <p className="text-[#002fa7] font-bold text-[10px] uppercase tracking-widest mb-3">Il progetto / Roadmap</p>
+            <div className="space-y-3">
               {formData.steps.map((phaseStep, idx) => (
                 <div key={idx} className="pl-3" style={{ borderLeft: '3px solid #002fa7' }}>
-                  <p className="font-bold text-xs text-[#002fa7]">Fase {phaseStep.step_number}: {phaseStep.title || 'Senza titolo'}</p>
-                  {phaseStep.duration && <p className="text-[10px] text-gray-400 italic">Richiede {phaseStep.duration}</p>}
-                  {phaseStep.description && <p className="text-[10px] text-gray-600 mt-1 leading-relaxed">{phaseStep.description}</p>}
-                  {phaseStep.output && <p className="text-[10px] text-gray-700 mt-1"><span className="font-semibold">Output:</span> {phaseStep.output}</p>}
+                  <p className="font-bold text-xs text-[#002fa7]">Fase {phaseStep.step_number}: <E>{phaseStep.title || 'Senza titolo'}</E></p>
+                  {phaseStep.duration && <p className="text-[10px] text-gray-400 italic">Richiede <E>{phaseStep.duration}</E></p>}
+                  {phaseStep.description && <E tag="p" className="text-[10px] text-gray-600 mt-1 leading-relaxed">{phaseStep.description}</E>}
+                  {phaseStep.output && <p className="text-[10px] mt-1"><span className="font-semibold">Output:</span> <E>{phaseStep.output}</E></p>}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Footer */}
-        <div className="mt-6 pt-3 border-t border-gray-100 flex justify-between items-end">
-          <p className="text-[10px] text-gray-300">1/{allServices.length > 6 ? '4' : '3'}</p>
-          <p className="text-[10px] text-gray-300 italic">enjoy the juice.</p>
-        </div>
+        <PageFooter num={1} tot={totalPages} />
       </Page>
 
-      {/* PAGE 3: PROPOSTA ECONOMICA */}
+      {/* ========== PAGINA 3: PROPOSTA ECONOMICA ========== */}
       <Page>
-        <div className="flex justify-between items-start mb-6 pb-4 border-b-2 border-[#002fa7]">
-          <p className="text-[#002fa7] font-extrabold text-base tracking-wide">LIMONE BLU STUDIO</p>
-          <p className="text-gray-400 text-[10px]">Preventivo | {dateStr}</p>
-        </div>
-
-        <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-4">Proposta economica</p>
+        <PageHeader />
+        <p className="text-[#002fa7] font-bold text-[10px] uppercase tracking-widest mb-4">Proposta economica</p>
 
         <div className="space-y-0">
           {allServices.filter(s => s.is_selected).map((svc, idx) => (
             <div key={idx} className="py-3 border-b border-gray-100">
               <div className="flex justify-between items-start">
                 <div className="flex-1 mr-4">
-                  <p className="font-bold text-xs text-gray-800">{svc.service_name}</p>
-                  {svc.description && <p className="text-[10px] text-gray-400 mt-0.5">{svc.description}</p>}
+                  <E tag="p" className="font-bold text-xs text-gray-800">{svc.service_name}</E>
+                  {svc.description && <E tag="p" className="text-[10px] text-gray-400 mt-0.5">{svc.description}</E>}
                   {svc.sub_items && svc.sub_items.length > 0 && (
                     <div className="mt-1.5 space-y-0.5 pl-2">
                       {svc.sub_items.map((item, i) => (
-                        <p key={i} className="text-[10px] text-gray-500">- {item}</p>
+                        <E tag="p" key={i} className="text-[10px] text-gray-500">- {item}</E>
                       ))}
                     </div>
                   )}
@@ -1114,80 +1135,72 @@ const QuotePreview = ({ formData, clients, suppliers, calculateTotal }) => {
           ))}
         </div>
 
-        {/* Total */}
         <div className="mt-4 pt-3 border-t-2 border-[#002fa7] flex justify-between items-center">
           <span className="font-extrabold text-sm text-gray-800">TOTALE</span>
           <span className="font-extrabold text-lg text-[#002fa7]">{formatPrice(total, 'una_tantum')}</span>
         </div>
 
-        <div className="mt-6 pt-3 border-t border-gray-100 flex justify-between items-end">
-          <p className="text-[10px] text-gray-300">2/{allServices.length > 6 ? '4' : '3'}</p>
-          <p className="text-[10px] text-gray-300 italic">enjoy the juice.</p>
-        </div>
+        <PageFooter num={2} tot={totalPages} />
       </Page>
 
-      {/* PAGE 4: INFO AGGIUNTIVE */}
+      {/* ========== PAGINA 4: INFO AGGIUNTIVE ========== */}
       <Page>
-        <div className="flex justify-between items-start mb-6 pb-4 border-b-2 border-[#002fa7]">
-          <p className="text-[#002fa7] font-extrabold text-base tracking-wide">LIMONE BLU STUDIO</p>
-          <p className="text-gray-400 text-[10px]">Preventivo | {dateStr}</p>
-        </div>
+        <PageHeader />
+        <p className="text-[#002fa7] font-bold text-[10px] uppercase tracking-widest mb-4">Info aggiuntive</p>
 
-        <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-4">Info aggiuntive</p>
-
-        <div className="space-y-5 text-[11px] text-gray-600 leading-relaxed">
+        <div className="space-y-4 text-[11px] text-gray-600 leading-relaxed">
           <div>
-            <p className="font-bold text-xs text-gray-800 mb-1">Validità, riservatezza e limiti del preventivo</p>
-            <p>Il presente preventivo ha validità n.{formData.validity_days || 30} giorni. Le informazioni contenute nel presente documento sono riservate e non potranno essere cedute o divulgate a terzi senza il consenso scritto dell'altra parte. Qualsiasi servizio non espressamente incluso sarà oggetto di valutazione separata, comprese le spese di trasferta ed eventuali costi aggiuntivi.</p>
-            <p className="mt-1">Le attività ed i costi riportati nel preventivo potrebbero subire variazioni di anno in anno secondo linee guida del mercato.</p>
+            <E tag="p" className="font-bold text-xs text-gray-800 mb-1">Validità, riservatezza e limiti del preventivo</E>
+            <E tag="p">Il presente preventivo ha validità n.{formData.validity_days || 30} giorni. Le informazioni contenute nel presente documento sono riservate e non potranno essere cedute o divulgate a terzi senza il consenso scritto dell'altra parte. Qualsiasi servizio non espressamente incluso sarà oggetto di valutazione separata, comprese le spese di trasferta ed eventuali costi aggiuntivi.</E>
+            <E tag="p" className="mt-1">Le attività ed i costi riportati nel preventivo potrebbero subire variazioni di anno in anno secondo linee guida del mercato.</E>
           </div>
 
           {formData.delivery_time && (
             <div>
-              <p className="font-bold text-xs text-gray-800 mb-1">Tempi di consegna</p>
-              <p>Il progetto avrà inizio entro 7 giorni lavorativi dalla ricezione dell'acconto. La durata stimata del progetto è di circa {formData.delivery_time}, salvo imprevisti o modifiche in corso d'opera.</p>
-              <p className="mt-1">Il rispetto delle tempistiche è subordinato alla puntualità nella consegna dei materiali da parte del cliente (testi, immagini, loghi, ecc.).</p>
+              <E tag="p" className="font-bold text-xs text-gray-800 mb-1">Tempi di consegna</E>
+              <E tag="p">Il progetto avrà inizio entro 7 giorni lavorativi dalla ricezione dell'acconto. La durata stimata del progetto è di circa {formData.delivery_time}, salvo imprevisti o modifiche in corso d'opera.</E>
+              <E tag="p" className="mt-1">Il rispetto delle tempistiche è subordinato alla puntualità nella consegna dei materiali da parte del cliente (testi, immagini, loghi, ecc.).</E>
             </div>
           )}
 
           <div>
-            <p className="font-bold text-xs text-gray-800 mb-1">Contenuti e attività extra-preventivo</p>
-            <p>Sono da considerarsi extra-preventivo tutte le attività non espressamente incluse nel presente documento e che saranno preventivate separatamente. In particolare:</p>
-            <ul className="mt-1 space-y-0.5 pl-3">
-              <li>- produzione di contenuti fotografici e video</li>
-              <li>- copywriting integrale di testi non forniti dal cliente</li>
-              <li>- traduzioni o gestione multilingua</li>
-              <li>- modifiche strutturali richieste dopo l'approvazione del layout</li>
-              <li>- inserimento di funzionalità aggiuntive non previste</li>
-              <li>- campagne advertising, attività SEO avanzata, gestione social o altri servizi di comunicazione non inclusi</li>
-              <li>- eventuali verifiche legali o consulenze specialistiche relative alla documentazione GDPR</li>
-            </ul>
+            <E tag="p" className="font-bold text-xs text-gray-800 mb-1">Contenuti e attività extra-preventivo</E>
+            <E tag="p">Sono da considerarsi extra-preventivo tutte le attività non espressamente incluse nel presente documento e che saranno preventivate separatamente. In particolare:</E>
+            <div className="mt-1 space-y-0.5 pl-3">
+              <E tag="p">- produzione di contenuti fotografici e video</E>
+              <E tag="p">- copywriting integrale di testi non forniti dal cliente</E>
+              <E tag="p">- traduzioni o gestione multilingua</E>
+              <E tag="p">- modifiche strutturali richieste dopo l'approvazione del layout</E>
+              <E tag="p">- inserimento di funzionalità aggiuntive non previste</E>
+              <E tag="p">- campagne advertising, attività SEO avanzata, gestione social o altri servizi di comunicazione non inclusi</E>
+              <E tag="p">- eventuali verifiche legali o consulenze specialistiche relative alla documentazione GDPR</E>
+            </div>
           </div>
 
           <div>
-            <p className="font-bold text-xs text-gray-800 mb-1">Modalità di accettazione</p>
-            <p>Inviare il seguente preventivo firmato e timbrato alla casella e-mail: <span className="font-semibold">info@limoneblu.it</span></p>
+            <E tag="p" className="font-bold text-xs text-gray-800 mb-1">Modalità di accettazione</E>
+            <E tag="p">Inviare il seguente preventivo firmato e timbrato alla casella e-mail: info@limoneblu.it</E>
           </div>
 
           <div>
-            <p className="font-bold text-xs text-gray-800 mb-1">Modalità di pagamento</p>
-            <p>{formData.payment_terms || "30% all'accettazione, 70% alla consegna"}</p>
-            <p className="mt-1">I pagamenti dovranno avvenire a mezzo bonifico bancario entro 15 giorni dalla data di emissione della fattura elettronica.</p>
+            <E tag="p" className="font-bold text-xs text-gray-800 mb-1">Modalità di pagamento</E>
+            <E tag="p">{formData.payment_terms || "30% all'accettazione, 70% alla consegna"}</E>
+            <E tag="p" className="mt-1">I pagamenti dovranno avvenire a mezzo bonifico bancario entro 15 giorni dalla data di emissione della fattura elettronica.</E>
           </div>
 
           {formData.extra_notes && (
             <div>
-              <p className="font-bold text-xs text-gray-800 mb-1">Note</p>
-              <p>{formData.extra_notes}</p>
+              <E tag="p" className="font-bold text-xs text-gray-800 mb-1">Note</E>
+              <E tag="p">{formData.extra_notes}</E>
             </div>
           )}
         </div>
 
         {/* Firma */}
-        <div className="mt-8 pt-6 border-t border-gray-200">
+        <div className="mt-6 pt-4 border-t border-gray-200">
           <p className="text-[10px] text-gray-400 mb-1">Firma del Rappresentante legale</p>
           {client && (
-            <div className="text-[10px] text-gray-500 mt-2">
+            <div className="text-[10px] text-gray-500 mt-1.5">
               <p className="font-semibold text-gray-700">{client.company_name}</p>
               <p>{client.address}</p>
               <p>P.IVA: {client.vat_number}</p>
@@ -1196,10 +1209,7 @@ const QuotePreview = ({ formData, clients, suppliers, calculateTotal }) => {
           <div className="w-48 border-b border-gray-300 mt-6 mb-2" />
         </div>
 
-        <div className="mt-6 pt-3 border-t border-gray-100 flex justify-between items-end">
-          <p className="text-[10px] text-gray-300">{allServices.length > 6 ? '4/4' : '3/3'}</p>
-          <p className="text-[10px] text-gray-300 italic">enjoy the juice.</p>
-        </div>
+        <PageFooter num={totalPages} tot={totalPages} />
       </Page>
     </div>
   );
