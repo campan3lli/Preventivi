@@ -1017,14 +1017,9 @@ const QuotePreview = ({ formData, clients, suppliers, calculateTotal, onFormChan
 
       {/* ========== COPERTINA ========== */}
       <div className="bg-[#002fa7] shadow-lg rounded-lg overflow-hidden relative" style={{ minHeight: '480px' }}>
-        {/* Logo top-left */}
+        {/* Logo top-left - bigger */}
         <div className="absolute top-8 left-8">
-          <img src="https://customer-assets.emergentagent.com/job_quote-builder-217/artifacts/sliapkzx_3.png" alt="Limone Blu Studio" style={{ height: '52px' }} />
-        </div>
-
-        {/* LIMONE BLU STUDIO - large vertical text on right */}
-        <div className="absolute right-6 top-0 bottom-0 flex flex-col justify-center items-end pointer-events-none select-none" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-          <span className="text-white/10 font-extrabold tracking-widest" style={{ fontSize: '72px', letterSpacing: '12px' }}>LIMONE BLU STUDIO</span>
+          <img src="https://customer-assets.emergentagent.com/job_quote-builder-217/artifacts/sliapkzx_3.png" alt="Limone Blu Studio" className="w-24 h-auto" />
         </div>
 
         {/* Content lower-left */}

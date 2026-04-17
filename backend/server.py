@@ -534,9 +534,9 @@ async def generate_quote_pdf(quote_id: str):
         [Spacer(1, 100)],
         [Paragraph('<font color="white" size="28"><b>PREVENTIVO</b></font>', title_style)],
         [Spacer(1, 20)],
-        [Paragraph(f'<font color="white" size="12">{quote.get("quote_number", "")}/2026</font>', normal_style)],
+        [Paragraph(f'<font color="white" size="12">{quote.get("quote_number", "")}/{datetime.now().year}</font>', normal_style)],
         [Spacer(1, 30)],
-        [Paragraph('<font color="#dbf637" size="10">Questo documento è un preventivo collettivo basato sui costi di freelancer operanti all\'interno dello studio.</font>', small_style)],
+        [Paragraph('<font color="#dbf637" size="9">Questo documento è un preventivo collettivo basato sui costi di freelancer operanti all\'interno dello studio.</font>', small_style)],
     ]
     
     cover_table = Table(cover_data, colWidths=[16*cm])
@@ -572,10 +572,11 @@ async def generate_quote_pdf(quote_id: str):
     # Supplier & Client info
     supplier_text = ""
     for s in suppliers:
-        supplier_text += f"<b>{s.get('name', '')}</b><br/>"
-        supplier_text += f"{s.get('legal_name', '')}<br/>"
-        supplier_text += f"{s.get('address', '')}<br/>"
-        supplier_text += f"P.IVA {s.get('vat_number', '')}<br/>"
+        supplier_text += f"<b>{s.get('legal_name', '') or s.get('name', '')}</b><br/>"
+        if s.get('address'):
+            supplier_text += f"{s.get('address')}<br/>"
+        if s.get('vat_number'):
+            supplier_text += f"P.IVA {s.get('vat_number')}<br/>"
         if s.get('phone'):
             supplier_text += f"{s.get('phone')}<br/>"
         if s.get('email'):
@@ -609,7 +610,7 @@ async def generate_quote_pdf(quote_id: str):
     
     # Methodology
     if quote.get('methodology'):
-        elements.append(Paragraph('<b>Metodologia e approccio</b>', heading_style))
+        elements.append(Paragraph('<b>Metodologia e approccio al lavoro</b>', heading_style))
         elements.append(Paragraph(quote['methodology'], normal_style))
         elements.append(Spacer(1, 15))
     
@@ -617,7 +618,7 @@ async def generate_quote_pdf(quote_id: str):
     quote_type = quote.get('quote_type', 'standard')
     
     if quote_type in ('step', 'ibrido'):
-        elements.append(Paragraph('<b>Fasi del progetto</b>', heading_style))
+        elements.append(Paragraph('<b>Il progetto / Roadmap</b>', heading_style))
         for step_data in quote.get('steps', []):
             step_title_style = ParagraphStyle('StepTitle', parent=styles['Normal'], fontSize=12, textColor=BLUE, fontName='Helvetica-Bold', spaceAfter=4)
             elements.append(Paragraph(f"Fase {step_data.get('step_number', '')}: {step_data.get('title', '')}", step_title_style))
@@ -627,21 +628,18 @@ async def generate_quote_pdf(quote_id: str):
                 elements.append(Paragraph(step_data['description'], normal_style))
             if step_data.get('output'):
                 elements.append(Paragraph(f"<b>Output:</b> {step_data['output']}", normal_style))
-            # Show services within this step
             for svc in step_data.get('services', []):
                 if svc.get('is_selected', True):
                     elements.append(Spacer(1, 4))
-                    elements.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;<b>{svc.get('service_name', '')}</b> — {format_price(svc.get('price', 0), svc.get('price_type', 'una_tantum'))}", normal_style))
+                    elements.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;<b>{svc.get('service_name', '')}</b> \u2014 {format_price(svc.get('price', 0), svc.get('price_type', 'una_tantum'))}", normal_style))
                     for sub in svc.get('sub_items', []):
-                        elements.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• {sub}", small_style))
+                        elements.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\u2022 {sub}", small_style))
             elements.append(Spacer(1, 12))
     
-    # Services table - Proposta economica
+    # Proposta economica
     elements.append(Paragraph('<b>Proposta economica</b>', heading_style))
     
     all_services = list(quote.get('services', []))
-    
-    # Also collect services from steps
     if quote_type in ('step', 'ibrido'):
         for step_data in quote.get('steps', []):
             all_services.extend(step_data.get('services', []))
@@ -653,7 +651,7 @@ async def generate_quote_pdf(quote_id: str):
             sub_items = svc.get('sub_items', [])
             sub_text = ""
             for sub in sub_items:
-                sub_text += f"<br/>&nbsp;&nbsp;&nbsp;&nbsp;• {sub}"
+                sub_text += f"<br/>&nbsp;&nbsp;&nbsp;&nbsp;\u2022 {sub}"
             
             svc_block = f"<b>{svc_name}</b>"
             if svc_desc:
@@ -688,28 +686,68 @@ async def generate_quote_pdf(quote_id: str):
         ('LINEABOVE', (0, 0), (-1, 0), 1.5, BLUE),
     ]))
     elements.append(total_table)
-    elements.append(Spacer(1, 20))
     
-    # Additional info
+    # ============ INFO AGGIUNTIVE (full page) ============
+    elements.append(PageBreak())
     elements.append(Paragraph('<b>Info aggiuntive</b>', heading_style))
-    elements.append(Paragraph(f"<b>Validità:</b> {quote.get('validity_days', 30)} giorni dalla data di emissione.", normal_style))
-    elements.append(Paragraph("<b>Riservatezza:</b> Il presente documento è riservato e non può essere diffuso a terzi.", normal_style))
-    
-    if quote.get('delivery_time'):
-        elements.append(Paragraph(f"<b>Tempi di consegna:</b> {quote.get('delivery_time')}", normal_style))
-    
     elements.append(Spacer(1, 10))
-    elements.append(Paragraph(f"<b>Modalità di pagamento:</b> {quote.get('payment_terms', '')}", normal_style))
-    elements.append(Paragraph("<b>Modalità di accettazione:</b> Inviare il presente documento firmato e timbrato a info@limoneblu.it", normal_style))
     
+    # Validità, riservatezza e limiti
+    elements.append(Paragraph('<b>Validità, riservatezza e limiti del preventivo</b>', normal_style))
+    validity_text = f"Il presente preventivo ha validità n.{quote.get('validity_days', 30)} giorni. Le informazioni contenute nel presente documento sono riservate e non potranno essere cedute o divulgate a terzi senza il consenso scritto dell'altra parte. Qualsiasi servizio non espressamente incluso sarà oggetto di valutazione separata, comprese le spese di trasferta ed eventuali costi aggiuntivi."
+    elements.append(Paragraph(validity_text, small_style))
+    elements.append(Paragraph("Le attività ed i costi riportati nel preventivo potrebbero subire variazioni di anno in anno secondo linee guida del mercato.", small_style))
+    elements.append(Spacer(1, 10))
+    
+    # Tempi di consegna
+    if quote.get('delivery_time'):
+        elements.append(Paragraph('<b>Tempi di consegna</b>', normal_style))
+        elements.append(Paragraph(f"Il progetto avrà inizio entro 7 giorni lavorativi dalla ricezione dell'acconto. La durata stimata del progetto è di circa {quote.get('delivery_time')}, salvo imprevisti o modifiche in corso d'opera.", small_style))
+        elements.append(Paragraph("Il rispetto delle tempistiche è subordinato alla puntualità nella consegna dei materiali da parte del cliente (testi, immagini, loghi, ecc.).", small_style))
+        elements.append(Spacer(1, 10))
+    
+    # Contenuti extra-preventivo
+    elements.append(Paragraph('<b>Contenuti e attività extra-preventivo</b>', normal_style))
+    elements.append(Paragraph("Sono da considerarsi extra-preventivo tutte le attività non espressamente incluse nel presente documento e che saranno preventivate separatamente. In particolare:", small_style))
+    extra_items = [
+        "produzione di contenuti fotografici e video",
+        "copywriting integrale di testi non forniti dal cliente",
+        "traduzioni o gestione multilingua",
+        "modifiche strutturali richieste dopo l'approvazione del layout",
+        "inserimento di funzionalità aggiuntive non previste",
+        "campagne advertising, attività SEO avanzata, gestione social o altri servizi di comunicazione non inclusi",
+        "eventuali verifiche legali o consulenze specialistiche relative alla documentazione GDPR",
+    ]
+    for item in extra_items:
+        elements.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;\u2022 {item}", small_style))
+    elements.append(Spacer(1, 10))
+    
+    # Accettazione
+    elements.append(Paragraph('<b>Modalità di accettazione</b>', normal_style))
+    elements.append(Paragraph("Inviare il seguente preventivo firmato e timbrato alla casella e-mail: <b>info@limoneblu.it</b>", small_style))
+    elements.append(Spacer(1, 10))
+    
+    # Pagamento
+    elements.append(Paragraph('<b>Modalità di pagamento</b>', normal_style))
+    elements.append(Paragraph(f"{quote.get('payment_terms', '')}", small_style))
+    elements.append(Paragraph("I pagamenti dovranno avvenire a mezzo bonifico bancario entro 15 giorni dalla data di emissione della fattura elettronica.", small_style))
+    
+    # Note
     if quote.get('extra_notes'):
         elements.append(Spacer(1, 10))
-        elements.append(Paragraph(f"<b>Note:</b> {quote.get('extra_notes')}", normal_style))
+        elements.append(Paragraph('<b>Note</b>', normal_style))
+        elements.append(Paragraph(quote['extra_notes'], small_style))
     
-    # Signature
-    elements.append(Spacer(1, 40))
-    elements.append(Paragraph("_________________________________", normal_style))
+    # Firma
+    elements.append(Spacer(1, 30))
     elements.append(Paragraph("Firma del Rappresentante legale", small_style))
+    if client:
+        elements.append(Spacer(1, 6))
+        elements.append(Paragraph(f"<b>{client.get('company_name', '')}</b>", small_style))
+        elements.append(Paragraph(f"{client.get('address', '')}", small_style))
+        elements.append(Paragraph(f"P.IVA: {client.get('vat_number', '')}", small_style))
+    elements.append(Spacer(1, 30))
+    elements.append(Paragraph("_________________________________", normal_style))
     
     # Build PDF
     doc.build(elements)
