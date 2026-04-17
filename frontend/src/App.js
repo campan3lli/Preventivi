@@ -969,165 +969,238 @@ const SortableStepCard = ({ id, idx, phaseStep, services, updateStep, removeStep
 // Quote PDF-style preview component
 const QuotePreview = ({ formData, clients, suppliers, calculateTotal }) => {
   const client = clients.find(c => c.id === formData.client_id);
-  const mainSupplier = suppliers.find(s => s.is_main);
+  const selectedSuppliers = suppliers.filter(s => formData.supplier_ids?.includes(s.id) || s.is_main);
   const isStepBased = formData.quote_type === 'step' || formData.quote_type === 'ibrido';
   const dateStr = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  const year = new Date().getFullYear();
 
   const allServices = [...(formData.services || [])];
   (formData.steps || []).forEach(st => { allServices.push(...(st.services || [])); });
+  const total = calculateTotal();
+
+  // Page wrapper
+  const Page = ({ children, className = '' }) => (
+    <div className={`bg-white shadow-md rounded-lg mb-4 ${className}`} style={{ padding: '32px 36px', position: 'relative' }}>
+      {children}
+    </div>
+  );
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden border" data-testid="quote-preview">
-      {/* Cover page */}
-      <div className="bg-[#002fa7] text-white p-10 min-h-[280px] flex flex-col justify-between">
+    <div data-testid="quote-preview" className="space-y-4">
+
+      {/* PAGE 1: COVER */}
+      <div className="bg-[#002fa7] shadow-lg rounded-lg flex flex-col justify-between" style={{ padding: '40px', minHeight: '400px' }}>
         <div>
-          <img src="https://customer-assets.emergentagent.com/job_quote-builder-217/artifacts/sliapkzx_3.png" alt="Logo" className="h-12 mb-6" />
-          <p className="text-sm opacity-70 tracking-widest uppercase">Limone Blu Studio</p>
+          <img src="https://customer-assets.emergentagent.com/job_quote-builder-217/artifacts/sliapkzx_3.png" alt="Logo" className="h-14 mb-8" />
+          <p className="text-white/50 text-xs tracking-[0.3em] uppercase mt-4">Limone Blu Studio</p>
         </div>
         <div>
-          <h2 className="text-4xl font-bold tracking-tight mb-3">PREVENTIVO</h2>
-          <p className="text-lg opacity-90">N. ---/2026</p>
-          <p className="text-sm opacity-60 mt-4 max-w-md">Questo documento è un preventivo collettivo basato sui costi di freelancer operanti all'interno dello studio.</p>
+          <h1 className="text-white text-5xl font-extrabold tracking-tight mb-4">PREVENTIVO</h1>
+          <p className="text-white/80 text-xl mb-8">---/{year}</p>
         </div>
+        <p className="text-[#dbf637] text-xs leading-relaxed max-w-sm">
+          Questo documento è un preventivo collettivo basato sui costi di freelancer operanti all'interno dello studio.
+        </p>
       </div>
 
-      {/* Content pages */}
-      <div className="p-8 space-y-8">
-        {/* Header */}
-        <div className="flex justify-between items-start border-b pb-4">
+      {/* PAGE 2: HEADER + SUPPLIER/CLIENT + PREMISE + METHODOLOGY */}
+      <Page>
+        {/* Header bar */}
+        <div className="flex justify-between items-start mb-6 pb-4 border-b-2 border-[#002fa7]">
           <div>
-            <p className="text-[#002fa7] font-bold text-lg">LIMONE BLU STUDIO</p>
-            <p className="text-xs text-gray-400">Data: {dateStr}</p>
+            <p className="text-[#002fa7] font-extrabold text-base tracking-wide">LIMONE BLU STUDIO</p>
+            <p className="text-gray-400 text-[10px] mt-0.5">Preventivo | Data: {dateStr}</p>
           </div>
-          <p className="text-sm text-gray-600">Og. {formData.subject || '—'}</p>
+          <div className="text-right">
+            <p className="text-gray-600 text-xs">Og. <span className="font-semibold">{formData.subject || '—'}</span></p>
+          </div>
         </div>
 
-        {/* Supplier / Client */}
-        <div className="grid grid-cols-2 gap-8">
+        {/* Fornitore / Cliente */}
+        <div className="grid grid-cols-2 gap-10 mb-8">
           <div>
-            <p className="text-[#002fa7] font-bold text-sm mb-2">Fornitore</p>
-            {mainSupplier ? (
-              <div className="text-xs text-gray-600 space-y-0.5">
-                <p className="font-semibold text-gray-800">{mainSupplier.name}</p>
-                <p>{mainSupplier.legal_name}</p>
-                <p>{mainSupplier.address}</p>
-                {mainSupplier.vat_number && <p>P.IVA {mainSupplier.vat_number}</p>}
-                {mainSupplier.email && <p>{mainSupplier.email}</p>}
+            <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-3">Fornitore</p>
+            {selectedSuppliers.map((s, i) => (
+              <div key={i} className="mb-3">
+                <p className="font-semibold text-xs text-gray-800">{s.legal_name || s.name}</p>
+                {s.address && <p className="text-[10px] text-gray-500">{s.address}</p>}
+                {s.vat_number && <p className="text-[10px] text-gray-500">P.IVA {s.vat_number}</p>}
+                {s.phone && <p className="text-[10px] text-gray-500">{s.phone}</p>}
+                {s.email && <p className="text-[10px] text-gray-500">{s.email}</p>}
               </div>
-            ) : <p className="text-xs text-gray-400 italic">Nessun fornitore</p>}
+            ))}
           </div>
           <div>
-            <p className="text-[#002fa7] font-bold text-sm mb-2">Cliente</p>
+            <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-3">Cliente</p>
             {client ? (
-              <div className="text-xs text-gray-600 space-y-0.5">
-                <p className="font-semibold text-gray-800">{client.company_name}</p>
-                <p>{client.address}</p>
-                <p>P.IVA {client.vat_number}</p>
-                {client.phone && <p>{client.phone}</p>}
-                <p>{client.email}</p>
+              <div>
+                <p className="font-semibold text-xs text-gray-800">{client.company_name}</p>
+                <p className="text-[10px] text-gray-500">{client.address}</p>
+                <p className="text-[10px] text-gray-500">P.IVA {client.vat_number}</p>
+                {client.phone && <p className="text-[10px] text-gray-500">{client.phone}</p>}
+                <p className="text-[10px] text-gray-500">{client.email}</p>
               </div>
-            ) : <p className="text-xs text-gray-400 italic">Seleziona un cliente</p>}
+            ) : <p className="text-[10px] text-gray-400 italic">Seleziona un cliente</p>}
           </div>
         </div>
 
-        {/* Premise */}
+        {/* Premessa */}
         {formData.premise && (
-          <div>
-            <p className="text-[#002fa7] font-bold text-sm mb-1">Premessa</p>
-            <p className="text-sm text-gray-600 leading-relaxed">{formData.premise}</p>
+          <div className="mb-6">
+            <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-2">Premessa</p>
+            <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{formData.premise}</p>
           </div>
         )}
 
-        {/* Methodology */}
+        {/* Metodologia */}
         {formData.methodology && (
-          <div>
-            <p className="text-[#002fa7] font-bold text-sm mb-1">Metodologia e approccio</p>
-            <p className="text-sm text-gray-600 leading-relaxed">{formData.methodology}</p>
+          <div className="mb-6">
+            <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-2">Metodologia e approccio al lavoro</p>
+            <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{formData.methodology}</p>
           </div>
         )}
 
-        {/* Steps / Phases */}
+        {/* Steps/Phases (if step-based) */}
         {isStepBased && formData.steps.length > 0 && (
-          <div>
-            <p className="text-[#002fa7] font-bold text-sm mb-3">Fasi del progetto</p>
+          <div className="mb-4">
+            <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-3">Il progetto / Roadmap</p>
             <div className="space-y-4">
               {formData.steps.map((phaseStep, idx) => (
-                <div key={idx} className="border-l-3 border-[#002fa7] pl-4 py-1" style={{ borderLeftWidth: '3px', borderLeftColor: '#002fa7' }}>
-                  <p className="font-semibold text-sm text-[#002fa7]">Fase {phaseStep.step_number}: {phaseStep.title || 'Senza titolo'}</p>
-                  {phaseStep.duration && <p className="text-xs text-gray-400 italic">Richiede {phaseStep.duration}</p>}
-                  {phaseStep.description && <p className="text-xs text-gray-600 mt-1">{phaseStep.description}</p>}
-                  {phaseStep.output && <p className="text-xs mt-1"><span className="font-semibold">Output:</span> {phaseStep.output}</p>}
-                  {phaseStep.services.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {phaseStep.services.map((svc, sIdx) => (
-                        <div key={sIdx} className="flex justify-between text-xs bg-gray-50 rounded px-2 py-1">
-                          <span className="text-gray-700">{svc.service_name}</span>
-                          <span className="font-semibold text-[#002fa7] ml-2 whitespace-nowrap">{formatPrice(svc.price, svc.price_type)}</span>
-                        </div>
+                <div key={idx} className="pl-3" style={{ borderLeft: '3px solid #002fa7' }}>
+                  <p className="font-bold text-xs text-[#002fa7]">Fase {phaseStep.step_number}: {phaseStep.title || 'Senza titolo'}</p>
+                  {phaseStep.duration && <p className="text-[10px] text-gray-400 italic">Richiede {phaseStep.duration}</p>}
+                  {phaseStep.description && <p className="text-[10px] text-gray-600 mt-1 leading-relaxed">{phaseStep.description}</p>}
+                  {phaseStep.output && <p className="text-[10px] text-gray-700 mt-1"><span className="font-semibold">Output:</span> {phaseStep.output}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="mt-6 pt-3 border-t border-gray-100 flex justify-between items-end">
+          <p className="text-[10px] text-gray-300">1/{allServices.length > 6 ? '4' : '3'}</p>
+          <p className="text-[10px] text-gray-300 italic">enjoy the juice.</p>
+        </div>
+      </Page>
+
+      {/* PAGE 3: PROPOSTA ECONOMICA */}
+      <Page>
+        <div className="flex justify-between items-start mb-6 pb-4 border-b-2 border-[#002fa7]">
+          <p className="text-[#002fa7] font-extrabold text-base tracking-wide">LIMONE BLU STUDIO</p>
+          <p className="text-gray-400 text-[10px]">Preventivo | {dateStr}</p>
+        </div>
+
+        <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-4">Proposta economica</p>
+
+        <div className="space-y-0">
+          {allServices.filter(s => s.is_selected).map((svc, idx) => (
+            <div key={idx} className="py-3 border-b border-gray-100">
+              <div className="flex justify-between items-start">
+                <div className="flex-1 mr-4">
+                  <p className="font-bold text-xs text-gray-800">{svc.service_name}</p>
+                  {svc.description && <p className="text-[10px] text-gray-400 mt-0.5">{svc.description}</p>}
+                  {svc.sub_items && svc.sub_items.length > 0 && (
+                    <div className="mt-1.5 space-y-0.5 pl-2">
+                      {svc.sub_items.map((item, i) => (
+                        <p key={i} className="text-[10px] text-gray-500">- {item}</p>
                       ))}
                     </div>
                   )}
                 </div>
-              ))}
+                <span className="font-bold text-xs text-[#002fa7] whitespace-nowrap">{formatPrice(svc.price, svc.price_type)}</span>
+              </div>
             </div>
+          ))}
+        </div>
+
+        {/* Total */}
+        <div className="mt-4 pt-3 border-t-2 border-[#002fa7] flex justify-between items-center">
+          <span className="font-extrabold text-sm text-gray-800">TOTALE</span>
+          <span className="font-extrabold text-lg text-[#002fa7]">{formatPrice(total, 'una_tantum')}</span>
+        </div>
+
+        <div className="mt-6 pt-3 border-t border-gray-100 flex justify-between items-end">
+          <p className="text-[10px] text-gray-300">2/{allServices.length > 6 ? '4' : '3'}</p>
+          <p className="text-[10px] text-gray-300 italic">enjoy the juice.</p>
+        </div>
+      </Page>
+
+      {/* PAGE 4: INFO AGGIUNTIVE */}
+      <Page>
+        <div className="flex justify-between items-start mb-6 pb-4 border-b-2 border-[#002fa7]">
+          <p className="text-[#002fa7] font-extrabold text-base tracking-wide">LIMONE BLU STUDIO</p>
+          <p className="text-gray-400 text-[10px]">Preventivo | {dateStr}</p>
+        </div>
+
+        <p className="text-[#002fa7] font-bold text-xs uppercase tracking-wider mb-4">Info aggiuntive</p>
+
+        <div className="space-y-5 text-[11px] text-gray-600 leading-relaxed">
+          <div>
+            <p className="font-bold text-xs text-gray-800 mb-1">Validità, riservatezza e limiti del preventivo</p>
+            <p>Il presente preventivo ha validità n.{formData.validity_days || 30} giorni. Le informazioni contenute nel presente documento sono riservate e non potranno essere cedute o divulgate a terzi senza il consenso scritto dell'altra parte. Qualsiasi servizio non espressamente incluso sarà oggetto di valutazione separata, comprese le spese di trasferta ed eventuali costi aggiuntivi.</p>
+            <p className="mt-1">Le attività ed i costi riportati nel preventivo potrebbero subire variazioni di anno in anno secondo linee guida del mercato.</p>
           </div>
-        )}
 
-        {/* Proposta economica */}
-        <div>
-          <p className="text-[#002fa7] font-bold text-sm mb-3">Proposta economica</p>
-          <div className="border rounded-lg overflow-hidden">
-            <div className="bg-[#002fa7] text-white px-4 py-2.5 grid grid-cols-[1fr_auto] text-xs font-semibold">
-              <span>Servizio</span>
-              <span className="text-right">Prezzo</span>
+          {formData.delivery_time && (
+            <div>
+              <p className="font-bold text-xs text-gray-800 mb-1">Tempi di consegna</p>
+              <p>Il progetto avrà inizio entro 7 giorni lavorativi dalla ricezione dell'acconto. La durata stimata del progetto è di circa {formData.delivery_time}, salvo imprevisti o modifiche in corso d'opera.</p>
+              <p className="mt-1">Il rispetto delle tempistiche è subordinato alla puntualità nella consegna dei materiali da parte del cliente (testi, immagini, loghi, ecc.).</p>
             </div>
-            <div className="divide-y divide-gray-100">
-              {allServices.filter(s => s.is_selected).map((svc, idx) => (
-                <div key={idx} className="px-4 py-3 grid grid-cols-[1fr_auto] items-start gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">{svc.service_name}</p>
-                    {svc.sub_items && svc.sub_items.length > 0 && (
-                      <div className="mt-1 space-y-0.5">
-                        {svc.sub_items.map((item, i) => (
-                          <p key={i} className="text-[11px] text-gray-400 pl-1">- {item}</p>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-sm font-bold text-[#002fa7] whitespace-nowrap">{formatPrice(svc.price, svc.price_type)}</span>
-                </div>
-              ))}
-            </div>
-            <div className="border-t-2 border-[#002fa7] px-4 py-3 grid grid-cols-[1fr_auto] items-center">
-              <span className="font-bold text-sm">TOTALE</span>
-              <span className="font-bold text-lg text-[#002fa7]">{formatPrice(calculateTotal(), 'una_tantum')}</span>
-            </div>
+          )}
+
+          <div>
+            <p className="font-bold text-xs text-gray-800 mb-1">Contenuti e attività extra-preventivo</p>
+            <p>Sono da considerarsi extra-preventivo tutte le attività non espressamente incluse nel presente documento e che saranno preventivate separatamente. In particolare:</p>
+            <ul className="mt-1 space-y-0.5 pl-3">
+              <li>- produzione di contenuti fotografici e video</li>
+              <li>- copywriting integrale di testi non forniti dal cliente</li>
+              <li>- traduzioni o gestione multilingua</li>
+              <li>- modifiche strutturali richieste dopo l'approvazione del layout</li>
+              <li>- inserimento di funzionalità aggiuntive non previste</li>
+              <li>- campagne advertising, attività SEO avanzata, gestione social o altri servizi di comunicazione non inclusi</li>
+              <li>- eventuali verifiche legali o consulenze specialistiche relative alla documentazione GDPR</li>
+            </ul>
           </div>
-        </div>
 
-        {/* Info aggiuntive */}
-        <div className="border-t pt-6 space-y-2">
-          <p className="text-[#002fa7] font-bold text-sm mb-2">Info aggiuntive</p>
-          <p className="text-xs text-gray-600"><span className="font-semibold">Validità:</span> {formData.validity_days || 30} giorni dalla data di emissione.</p>
-          <p className="text-xs text-gray-600"><span className="font-semibold">Riservatezza:</span> Il presente documento è riservato e non può essere diffuso a terzi.</p>
-          {formData.delivery_time && <p className="text-xs text-gray-600"><span className="font-semibold">Tempi di consegna:</span> {formData.delivery_time}</p>}
-          <p className="text-xs text-gray-600"><span className="font-semibold">Modalità di pagamento:</span> {formData.payment_terms}</p>
-          <p className="text-xs text-gray-600"><span className="font-semibold">Modalità di accettazione:</span> Inviare il presente documento firmato e timbrato a info@limoneblu.it</p>
-          {formData.extra_notes && <p className="text-xs text-gray-600"><span className="font-semibold">Note:</span> {formData.extra_notes}</p>}
-        </div>
-
-        {/* Signature line */}
-        <div className="pt-8">
-          <div className="w-60 border-t border-gray-300 pt-2">
-            <p className="text-xs text-gray-400">Firma del Rappresentante legale</p>
+          <div>
+            <p className="font-bold text-xs text-gray-800 mb-1">Modalità di accettazione</p>
+            <p>Inviare il seguente preventivo firmato e timbrato alla casella e-mail: <span className="font-semibold">info@limoneblu.it</span></p>
           </div>
+
+          <div>
+            <p className="font-bold text-xs text-gray-800 mb-1">Modalità di pagamento</p>
+            <p>{formData.payment_terms || "30% all'accettazione, 70% alla consegna"}</p>
+            <p className="mt-1">I pagamenti dovranno avvenire a mezzo bonifico bancario entro 15 giorni dalla data di emissione della fattura elettronica.</p>
+          </div>
+
+          {formData.extra_notes && (
+            <div>
+              <p className="font-bold text-xs text-gray-800 mb-1">Note</p>
+              <p>{formData.extra_notes}</p>
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="text-center pt-4 border-t">
-          <p className="text-xs text-gray-300 italic">enjoy the juice.</p>
+        {/* Firma */}
+        <div className="mt-8 pt-6 border-t border-gray-200">
+          <p className="text-[10px] text-gray-400 mb-1">Firma del Rappresentante legale</p>
+          {client && (
+            <div className="text-[10px] text-gray-500 mt-2">
+              <p className="font-semibold text-gray-700">{client.company_name}</p>
+              <p>{client.address}</p>
+              <p>P.IVA: {client.vat_number}</p>
+            </div>
+          )}
+          <div className="w-48 border-b border-gray-300 mt-6 mb-2" />
         </div>
-      </div>
+
+        <div className="mt-6 pt-3 border-t border-gray-100 flex justify-between items-end">
+          <p className="text-[10px] text-gray-300">{allServices.length > 6 ? '4/4' : '3/3'}</p>
+          <p className="text-[10px] text-gray-300 italic">enjoy the juice.</p>
+        </div>
+      </Page>
     </div>
   );
 };
