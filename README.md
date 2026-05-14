@@ -98,7 +98,15 @@ npm install
 npm run build
 ```
 
-La cartella da servire come document root è `frontend/build`.
+Dopo ogni `npm run build`, copia i file generati nella document root reale di CloudPanel. In questo progetto il deploy attuale usa `/home/limoneblu-preventivi/htdocs/preventivi`.
+
+```bash
+mkdir -p /home/limoneblu-preventivi/htdocs/preventivi
+rm -rf /home/limoneblu-preventivi/htdocs/preventivi/*
+cp -r build/. /home/limoneblu-preventivi/htdocs/preventivi/
+```
+
+Questo passaggio e' obbligatorio: la build resta in `frontend/build`, ma CloudPanel serve i file dalla sua document root.
 
 ### Routing SPA
 
